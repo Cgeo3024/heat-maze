@@ -1,0 +1,85 @@
+<html>
+<head>
+<style>
+table, th, tr, td {
+    border:black 1px solid;
+    border-collapse:collapse;
+}
+
+div {
+    margin-left:0; 
+    margin-right: 0;
+    
+}
+
+.outerdiv {
+    width:100%;
+}
+ul {
+    list-style : none;
+    border: 1px black solid;
+}
+
+</style>
+<script src="http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.4.2/angular.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+
+<script src="app.js"</script>
+<script src="Chart.js"></script>
+
+</head>
+<body ng-app="HeatMazeApp">
+    <div ng-controller="mainController">
+
+        <div id="timer"> Elapsed Time (seconds) : {{time/100| number:0}}</div>
+        <div ng-if="room != null">
+        
+            <table>
+                <caption>Users</caption>
+                <tr>
+                    <th> Name </th>
+                    <th> Score </th>
+                </tr>
+                <tr ng-repeat="user in users">
+                    <td>{{user.name}}</td>
+                    <td>{{user.score}}</td>
+                </tr>
+            </table>
+            <div class="outerdiv">
+                <div ng-repeat="bar in bars">
+                <table>
+                    <caption> Bar {{bar.id}}. Made of {{bar.material}}
+                    </caption>
+                    <tr>
+                        <th>Position</th>
+                        <th>Temperature</th>
+                    </tr>
+                    <tr ng-repeat="temp in bar.temps track by $index">
+                        <td>{{$index}}</td>
+                        <td>{{temp| number:0}}</td>
+                    </tr>
+                </table>
+                <div>
+                    Set Variable Heat Sources Temperatures
+                    <div ng-repeat="pos in variableVals[$index].variables">
+                    Position: {{pos.pos}}
+                        <input type="number" name="input" ng-model="pos.temp">
+                        </input>
+                        
+                    </div>
+                    
+                    <button ng-click="updateSource($index)">Update </button>
+                </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="outerdiv">
+            Choose a Set Up
+            <button ng-repeat="choice in roomList" ng-click="changeRoom(choice)">Room {{choice}} </button>
+        </div>
+
+    </div>
+</body>
+</html>
