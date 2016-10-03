@@ -31,10 +31,10 @@ ul {
 </head>
 <body ng-app="HeatMazeApp">
     <div ng-controller="mainController">
-
-        <div id="timer"> Elapsed Time (seconds) : {{time/100| number:0}}</div>
-        <div ng-if="room != null">
         
+        <!--<div ng-include="template"></div>-->
+        <div ng-if="room != null">
+                <div id="timer"> Elapsed Time (seconds) : {{time/100| number:0}}</div>
             <table>
                 <caption>Users</caption>
                 <tr>
@@ -55,9 +55,9 @@ ul {
                         <th>Position</th>
                         <th>Temperature</th>
                     </tr>
-                    <tr ng-repeat="temp in bar.temps track by $index">
-                        <td>{{$index}}</td>
-                        <td>{{temp| number:0}}</td>
+                    <tr ng-repeat="point in bar.points track by $index">
+                        <td>{{point.pos}}</td>
+                        <td>{{point.temp| number:0}}</td>
                     </tr>
                 </table>
                 <div>
