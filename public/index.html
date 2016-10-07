@@ -4,6 +4,7 @@
 table, th, tr, td {
     border:black 1px solid;
     border-collapse:collapse;
+    width:80%;
 }
 
 div {
@@ -12,15 +13,26 @@ div {
     
 }
 
+.spreadElements
+{
+    display: flex; 
+    justify-content: space-between;
+}
 .outerdiv {
     width:100%;
+
 }
 ul {
     list-style : none;
     border: 1px black solid;
 }
 
+.navButton{
+    
+}
 </style>
+
+
 <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.7/angular.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
@@ -32,52 +44,23 @@ ul {
 <body ng-app="HeatMazeApp">
     <div ng-controller="mainController">
         
+        <button ng-if="navDepth > 0" ng-click="back()"> Back </button>
         <!--<div ng-include="template"></div>-->
         <div ng-if="room != null">
-                <div id="timer"> Elapsed Time (seconds) : {{time/100| number:0}}</div>
-            <table>
-                <caption>Users</caption>
-                <tr>
-                    <th> Name </th>
-                    <th> Score </th>
-                </tr>
-                <tr ng-repeat="user in users">
-                    <td>{{user.name}}</td>
-                    <td>{{user.score}}</td>
-                </tr>
-            </table>
             <div class="outerdiv">
-                <div ng-repeat="bar in bars">
-                <table>
-                    <caption> Bar {{bar.id}}. Made of {{bar.material}}
-                    </caption>
-                    <tr>
-                        <th>Position</th>
-                        <th>Temperature</th>
-                    </tr>
-                    <tr ng-repeat="point in bar.points track by $index">
-                        <td>{{point.pos}}</td>
-                        <td>{{point.temp| number:0}}</td>
-                    </tr>
-                </table>
-                <div>
-                    Set Variable Heat Sources Temperatures
-                    <div ng-repeat="pos in variableVals[$index].variables">
-                    Position: {{pos.pos}}
-                        <input type="number" name="input" ng-model="pos.temp">
-                        </input>
-                        
-                    </div>
-                    
-                    <button ng-click="updateSource($index)">Update </button>
-                </div>
-                </div>
+
+              <div id="timer"> Elapsed Time (seconds) : {{time/100| number:0}}</div>
             </div>
+            <div ng-include="template"></div>
+            
         </div>
         
-        <div class="outerdiv">
+        <div ng-if="description == true" ng-include="descrURL">
+        </div>
+        
+        <div class="outerdiv" ng-if="navDepth < 2">
             Choose a Set Up
-            <button ng-repeat="choice in roomList" ng-click="changeRoom(choice)">Room {{choice}} </button>
+            <button class="navButton" ng-repeat="choice in navChoices" ng-click="navigateTo(choice)"> {{choice}} </button>
         </div>
 
     </div>

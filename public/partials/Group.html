@@ -1,0 +1,36 @@
+<table>
+    <caption>Users</caption>
+    <ul>
+        <li ng-repeat="user in users"> {{user.name}}</li>
+    </ul>
+</table>
+
+<span id="score">Current Room Score: {{score}}</span>
+<span id="TopScore">Top Room Score of All Time: {{BestScore}}</span>
+<div class="outerdiv spreadElements">
+    <div  ng-repeat="bar in bars">
+        <table>
+            <caption> Bar {{bar.id}}. Made of {{bar.material}}
+            </caption>
+            <tr>
+                <th>Position</th>
+                <th>Temperature</th>
+            </tr>
+            <tr ng-repeat="point in bar.points track by $index">
+                <td>{{point.pos}}</td>
+                <td>{{point.temp| number:0}}</td>
+            </tr>
+        </table>
+        <div ng-if="variableVals[$index].variables.length > 0">
+            Set Variable Heat Sources Temperatures
+            <div ng-repeat="pos in variableVals[$index].variables">
+            Position: {{pos.pos}}
+                <input type="number" name="input" ng-model="pos.temp">
+                </input>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="outerdiv">
+    <button ng-click="vote()">Vote for these settings</button>
+</div>

@@ -4,14 +4,18 @@ app.controller('mainController', function($scope, socket) {
     
     
     // ---- Solo User Room Constants --- //
-    $scope.roomList=["A", "B", "C", "D"];
+    $scope.navChoices = ["Group", "Solo"];
     $scope.users = [];
     $scope.bars = [];
     $scope.room = null;     
     $scope.time = 0;
     $scope.variableVals = [];
     $scope.template = "./partials/main.html";
-    
+    $scope.style = null;
+    $scope.descrURL = "./partials/descriptions/main.html";
+    $scope.description = true;
+    $scope.navDepth = 0;
+    $scope.score = 0;
     // --- requests room change from the server ----//
     $scope.changeRoom = function(room){
         console.log("ChangeRoom Request::" +  room);
@@ -19,9 +23,67 @@ app.controller('mainController', function($scope, socket) {
         socket.emit("switch room", ("Solo_"+room));
     }
     
+    $scope.back = function(){
+        
+        console.log("NavDepth " + $scope.navDepth);
+        if ($scope.navDepth == 1)
+        {
+            socket.emit("Leave Rooms");
+            $scope.style = null;
+            $scope.template = "./partials/main.html";
+            $scope.descrURL = "./partials/descriptions/main.html";
+            $scope.description = true;
+            $scope.navChoices = ["Group", "Solo"];
+        }
+        if ($scope.navDepth > 1)
+        {
+            socket.emit("Leave Room");
+            socket.emit("Start Rooms", $scope.stlye);
+            $scope.template = "./partials/" + $scope.stlye + ".html";
+            $scope.descrURL = "./partials/descriptions/"+ $scope.style + ".html";
+            $scope.room = null;
+            $scope.description = true;
+        }
+        
+        $scope.navDepth -=1;
+         
+    }
+    
+    $scope.navigateTo = function(choice){
+        $scope.navDepth += 1;
+        if ($scope.style == null )
+        {
+            socket.emit("Start Rooms", choice);
+            $scope.style = choice;
+            $scope.template = "./partials/" + choice + ".html";
+            $scope.descrURL = "./partials/descriptions/"+ choice + ".html";
+        }
+        else
+        {
+            $scope.description = false;
+            socket.emit($scope.style + " room", choice);
+            console.log($scope.style + " room");
+        }
+    }
+    
+    $scope.vote = function(){
+        console.log($scope.variableVals);
+        
+        var votes = [];
+        for (vv in $scope.variableVals)
+        {
+            if ($scope.variableVals[vv].variables.length > 0)
+            {
+                votes.push($scope.variableVals[vv]);
+            }
+        }
+        socket.emit("vote", votes);
+    }
+    
     // -- Requests change of variable heat source values --- ///
     $scope.updateSource = function(index){
         var num = index;
+        
         socket.emit("update sources", 
         {temps:$scope.variableVals[index].variables, bar:index});
     }
@@ -39,8 +101,10 @@ app.controller('mainController', function($scope, socket) {
         for (var j = 0; j < data.bars.length; j++){
             
             var newArray = [];
-            
+            console.log(data.bars[j]);
             if (!(data.bars[j].variable == null)) {
+                console.log(j);
+                console.log(data.bars[j].variable);
                 for (var i = 0; i < data.bars[j].variable.length; i++){  
                     var variable = data.bars[j].variable[i];
                     newArray.push({pos: variable.pos, temp: variable.temp   })
@@ -60,7 +124,8 @@ app.controller('mainController', function($scope, socket) {
                $scope.bars[i].points[j] = data.bars[i].points[j];
            }
        }
-       
+       console.log(data);
+       $scope.score = data.score;
        $scope.time += data.elapsedTime;
     });
     
@@ -71,6 +136,10 @@ app.controller('mainController', function($scope, socket) {
     
     socket.on('update users', function (data){
         
+    });
+    
+    socket.on('updateNav', function(navVals){
+        $scope.navChoices = navVals;
     });
 });
 

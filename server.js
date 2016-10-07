@@ -6,7 +6,6 @@ var bodyParser = require('body-parser');
 
 app.set('port', (process.env.PORT || 5000));
 
-
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
     extended: true
@@ -18,12 +17,32 @@ app.get('/', function(req, res){
     res.sendFile(__dirname + 'index.html');
 });
 
-var rooms = [];
+var GroupRooms = [];
 var barDelta = 5;
 var timeGap = 5;
+var voteGap = 3000; // time in between group room vote polls
 var roomTemp = 15;
 var userCount = 0;
 var users = [];
+var groupRoomNames = ["Easy", "Medium", "Hard"];
+var soloRoomNames = ["A", "B", "C", "D"];
+
+// == generates group rooms for use == //
+function InitGroupRooms(){
+    
+    for( var i = 0; i < groupRoomNames.length; i++)
+    {
+        var newRoom = {};
+        newRoom.name = groupRoomNames[i];
+        newRoom.users = [];
+        newRoom.room = initRoom("Group_" + groupRoomNames[i]);
+        
+        GroupRooms.push(newRoom);
+    }
+}
+
+
+InitGroupRooms();
 
 // Functions first set up when suer connects to the socket.io instance
 io.on('connection', function(socket){
@@ -32,17 +51,97 @@ io.on('connection', function(socket){
     
     users.push({id: socket.id, bars:null, handle: null});
     
+    socket.on("Solo room", function(choice)
+    {
+        console.log("user " + socket.id +" switched to " + choice);
+        
+        var thisUser = getUser(socket.id);
+        clearInterval(thisUser.handle);
+        
+        var newRoom = initRoom(choice);
+        
+        var initVals = summarize(newRoom);
+        
+        socket.emit("init", initVals);
+        
+        thisUser.room = newRoom;
+        clearInterval(thisUser.handle);
+
+        thisUser.solo = true;
+        thisUser.handle = setInterval(function() {
+           iterateRoom(thisUser.room);
+           var summary = summarize(thisUser.room);
+           socket.emit("update bars", {bars: summary.bars, elapsedTime : timeGap});
+           },
+           timeGap);
+    });
+    
+    socket.on("Group room", function(choice)
+    {
+        console.log(socket.id + " requests to join group room " + choice);
+        
+        if (groupRoomNames.indexOf(choice) == -1) {
+            socket.emit("No Such Room");
+            console.log("No such room found");
+            return;
+        }
+        
+        socket.join(choice);
+        
+        var thisUser = getUser(socket.id);
+        
+        thisUser.room = choice;
+        thisUser.solo = false;
+               
+        var groupRoom = getGroupRoom(choice);
+        groupRoom.users.push(thisUser);
+        var initVals = summarize(groupRoom.room);
+        
+        if (groupRoom.users.length <= 1)
+        {
+            groupRoom.tickHandle = setInterval(function() {
+                iterateRoom(groupRoom.room);
+                var summary = summarize(groupRoom.room);
+                io.to(groupRoom.name).emit("update room", {details: summary, elapsedTime : timeGap});
+            },
+            timeGap);
+            
+            groupRoom.voteHandle = setInterval(function() {
+                resolveVotes(groupRoom);
+                io.to(groupRoom.name).emit("vote done");
+            },
+            voteGap);
+        }
+        
+        socket.emit("init", initVals);     
+
+        
+    });
+    
+    socket.on("Start Rooms", function(choice)
+    {
+        if (choice == "Solo")
+        {
+            socket.emit("updateNav", soloRoomNames);
+        }
+        if (choice == "Group")
+        {
+            socket.emit("updateNav", groupRoomNames);
+        }
+    });
+
+    
     
     // user requests change to variable heat sources
     socket.on("update sources", function(data){
         
-        var thisUser = null;
-        for (user in users){
-            if (users[user].id == socket.id){
-                thisUser = users[user];
-            }
-        }
-
+        var thisUser = getUser(socket.id)
+        
+        if (user.solo == false)
+        {
+            vote(user, data);
+            return;
+        }        
         for (var i = 0; i < data.temps.length; i++){
             
             thisUser.room.bars[data.bar].temps[data.temps[i].pos] = data.temps[i].temp;
@@ -66,49 +165,110 @@ io.on('connection', function(socket){
             users.splice(index, 1);
         }
     });
-    // user switches to a new room
-    socket.on("switch room", function(room){
-        console.log("user " + socket.id +" switched to " + room);
+    
+    socket.on("vote", function(votes){
         
-        var thisUser = null;
-        for (user in users){
-            if (users[user].id == socket.id){
-                thisUser = users[user];
-            }
-        }
-        
-        clearInterval(thisUser.handle);
-        
-        var newRoom = initRoom(room);
-        //var newRoom = initBars(room);
-        
-        var initVals = summarize(newRoom);
-        
-        socket.emit("init", initVals);
-       // console.log("Init Vals : " + initVals);
-        
-        thisUser.room = newRoom;
-        for (user in users){
-            if (user.id == socket.id){
-                clearInterval(user.handle);
-                break;
-            }
-        }
-        thisUser.handle = setInterval(function() {
-           iterateRoom(thisUser.room);
-           var summary = summarize(thisUser.room);
-           socket.emit("update bars", {bars: summary.bars, elapsedTime : timeGap});
-           },
-           timeGap);
+        var thisUser = getUser(socket.id);
+        thisUser.vote = votes;
     });
 });
+
+
+function getMedian(data) {
+    
+    var midpoint = Math.floor((data.length - 1) / 2);
+    if (data.length % 2 != 0) {
+        return data[midpoint];
+    } else {
+        return (data[midpoint] + data[midpoint + 1]) / 2.0;
+    }
+}
+
+function resolveVotes(room){
+    
+
+    var talley = [];
+    for ( bar  in room.room.bars)
+    {   
+        talley.push([]);
+        for(v in room.room.bars[bar].variable)
+        {
+            
+            talley[bar].push({pos:room.room.bars[bar].variable[v], values:[]});
+        }
+    }
+    
+    var voteCount = 0;
+    for (i in room.users)
+    {   
+
+        var thisVote = room.users[i].vote;
+        
+        if(room.users[i].vote != null)
+        {
+            voteCount += 1;
+        }
+        
+        for (bar in thisVote)
+        {
+            for (point in thisVote[bar].variables)
+            {
+                console.log(thisVote[bar].variables[point]);
+                console.log(talley[thisVote[bar].bar][point]);
+                if (thisVote[bar].variables[point].pos == talley[thisVote[bar].bar][point].pos)
+                {
+                    talley[thisVote[bar].bar][point].values.push(thisVote[bar].variables[point].temp);
+                }
+            }
+        }
+    }  
+    console.log(talley);
+    
+    if (voteCount < 1)
+    {
+        return;        
+    }
+    
+    for (bar in talley)
+    {
+        for (point in talley[bar])
+        {
+            var talleyVal = talley[bar][point];
+            room.room.bars[bar].temps[talleyVal.pos] = getMedian(talleyVal.values);
+        }
+    }
+    
+    for (user in room.users)
+    {
+        room.users[user].vote = null;
+    }
+}
+
+function getUser(socketID)
+{
+    for (i in users){
+        if (users[i].id == socketID){
+            return users[i];
+        }
+    }
+}
+
+function getGroupRoom(roomName)
+{
+    for (i in GroupRooms){
+        if (GroupRooms[i].name == roomName){
+            return GroupRooms[i];
+        }
+    }
+}
 
 // creates a condensed sumamry of the user room for transmission
 function summarize(room)
 {
+    
     // temporarily stores the full list of summary bars
     var bars = [];
-    //console.log(room);
+
     for (var i = 0; i < room.bars.length; i++)
     {   
         var summBar = {};
@@ -119,7 +279,6 @@ function summarize(room)
         
         for (var j = 0; j < bar.watchPoints.length; j++)
         {
-            //console.log(bar.watchPoints);
             var pos = bar.watchPoints[j]
             summBar.points.push({pos: pos, temp: bar.temps[pos]})
         }
@@ -133,10 +292,9 @@ function summarize(room)
             }
         }
         bars.push(summBar);
-        //console.log(summBar);
     }
     
-    return {room: "~", bars:bars};
+    return {room: "~", bars:bars, score:room.score};
 }
 
 
@@ -149,23 +307,42 @@ function iterateRoom(room){
 
 function initRoom(roomType)
 {
-    var newRoom = {};
-    if (roomType == "Solo_A")
+    // Room: {Users: [], name: string, bars: [], roomTemp: int, score: int}
+    var newRoom = {score:0, roomTemp:20};
+    
+    if (roomType == "A")
     {
         newRoom.bars=initBars("A");
-        newRoom.roomTemp = 20;
     }
-    if (roomType == "Solo_B")
+    if (roomType == "B")
     {
         newRoom.bars=initBars("B");
         newRoom.roomTemp = 15;
     }
-    if (roomType == "Solo_C")
+    if (roomType == "C")
+    {
+        newRoom.bars=initBars("C");
+        newRoom.roomTemp = 25;
+        
+        newRoom.joins = [];
+        newRoom.joins.push({sideA: {bar: 0, pos: 9}, sideB: {bar: 1, pos: 2}, temp: 15});
+    }
+    if (roomType == "D")
+    {
+        newRoom.bars=initBars("D");
+        newRoom.roomTemp = 25;
+        
+        newRoom.joins = [];
+        newRoom.joins.push({sideA: {bar: 0, pos: 4}, sideB: {bar: 2, pos: 0}, temp: 15});
+        newRoom.joins.push({sideA: {bar: 2, pos: 2}, sideB: {bar: 1, pos: 1}, temp: 15});
+        
+    }
+    if (roomType == "Group_Easy")
     {
         newRoom.bars=initBars("C");
         newRoom.roomTemp = 25;
     }
-    if (roomType == "Solo_D")
+    if (roomType == "Group_Medium")
     {
         newRoom.bars=initBars("D");
         newRoom.roomTemp = 25;
@@ -173,23 +350,75 @@ function initRoom(roomType)
         
         newRoom.joins.push({sideA: {bar: 0, pos: 2}, sideB: {bar: 1, pos: 2}, temp: 15});
     }
-    if (roomType == "Group_A")
+    if (roomType == "Group_Hard")
+    {
+        newRoom.bars=initBars("B");
+        newRoom.roomTemp = 15;
+    }
+    return newRoom;
+}
+
+function initBars(roomType){
+    var bars = [];
+    if (roomType == "A")
     {
         
-    }
-    if (roomType == "Group_B")
-    {
+        var newBar = initBar("A", 15, "Cu", 20, 5);
+        
+        newBar.fixed    = [0];
+        newBar.variable = [0];
+        newBar.goals=[{pos:14, temp:30}];        
+        bars.push(newBar);
         
     }
-    if (roomType == "Group_C")
+    if (roomType == "B")
     {
+        var newBar = initBar("A", 10, "Cu", 15, 5);
+        
+        newBar.fixed    = [0];
+        newBar.variable = [0];
+        newBar.goals=[{pos:9, temp:25}]; 
+        newBar.globalLimit = 60;
+        bars.push(newBar);
+    }
+    if (roomType == "C")
+    {
+        var newBar = initBar("A", 10, "Fe", 15, 5);
+        
+        newBar.fixed    = [0, 9];
+        
+        bars.push(newBar);
+        
+        var newBar = initBar("B", 5, "Sn", 15, 5);
+        newBar.goals=[{pos:0, temp:30},{pos:4, temp:30}]
+        bars.push(newBar);
         
     }
     
-    return newRoom;
+    if (roomType == "D")
+    {
+        var newBar = initBar("A", 10, "Cu", 15, 5);
+        newBar.goals = [{pos:9, temp:10}];
+        newBar.fixed    = [0];
+        newBar.variable = [0];
+        bars.push(newBar);
+        
+        var newBar = initBar("B", 6, "Fe", 15, 5);
+        newBar.fixed    = [5];
+        newBar.variable = [5];
+        bars.push(newBar);
+        
+        var newBar = initBar("C", 3, "Cu", 15, 5);
+        bars.push(newBar);
+
+    }
+    
+    return bars;
 }
+
 // creates a standard bar with given length and standard temperature
 function initBar(id, length, material, roomTemp, divisions){
+    // bar: {temps:[], fixed:[{pos: int, temp:int}], watchPoints:[pos]}
     var newBar = {};
     newBar.id = id;
     newBar.material = material;
@@ -228,88 +457,16 @@ function divideBar(length, divisions)
     
     return points;
 }
-
-function initBars(roomType){
-    var bars = [];
-    if (roomType == "A")
-    {
-        
-        var newBar = initBar("A", 30, "Cu", 20, 5);
-        
-        newBar.fixed    = [0, 29];
-        newBar.variable = [0];
-        newBar.temps[0] = 40;
-        
-        bars.push(newBar);
-        
-    }
-    if (roomType == "B")
-    {
-        var newBar = initBar("A", 20, "Cu", 15, 5);
-        
-        newBar.fixed    = [0, 9];
-        newBar.variable = [9];
-        
-        bars.push(newBar);
-        
-        var newBar = initBar("B", 15, "Fe", 15, 5);
-        
-        newBar.fixed    = [0, 14];
-        newBar.variable = [0, 14];
-        
-        bars.push(newBar);
-    }
-    if (roomType == "C")
-    {
-        var newBar = initBar("A", 10, "Cu", 15, 5);
-        
-        newBar.fixed    = [0, 9];
-        newBar.variable = [];
-        
-        bars.push(newBar);
-        
-        var newBar = initBar("B", 15, "Fe", 15, 5);
-        
-        newBar.fixed    = [0, 14];
-        newBar.variable = [0, 14];
-        
-        bars.push(newBar);
-        
-        var newBar = initBar("Fe", 50, "Fe", 15, 10);
-        
-        newBar.fixed    = [0, 3, 14, 49];
-        newBar.variable = [0, 49];
-        
-        bars.push(newBar);
-    }
-    
-    if (roomType == "D")
-    {
-        var newBar = initBar("A", 5, "Cu", 15, 5);
-        
-        newBar.fixed = [];
-        bars.push(newBar);
-        
-        var newBar = initBar("B", 5, "Cu", 15, 5);
-        
-        newBar.fixed    = [0, 4];
-        newBar.variable = [0, 4];
-        
-        bars.push(newBar);
-
-    }
-    
-    return bars;
-}
-
 // iterates temperature changes along a bar.
 // CURENTLY NOT COMPLETE FOR THE EXTREME ENDS OF BARS
 function iterateBars(bars){
-
+    
+    var goal_reached = true;
+    var limit_exceeded = false;
+    
     for (bar in bars){
         var nextTemps = [];
-        
-        
+          
         for (var i = 0; i < bars[bar].temps.length; i++){
             nextTemps.push(bars[bar].temps[i]);
             
@@ -349,15 +506,39 @@ function iterateBars(bars){
             nextTemps[i] = bars[bar].temps[i] + deltaT;
         }
         
-        for (var i = 0; i <bars[bar].temps.length; i++){
-            if (bars[bar].fixed.indexOf(i) == -1) {
-                bars[bar].temps[i] = nextTemps[i];
-            } else {
-                bars[bar].temps[i] = bars[bar].temps[i];
+        if (bars[bar].fixed != null)
+        {
+            for (var i = 0; i <bars[bar].temps.length; i++){
+                if (bars[bar].fixed.indexOf(i) == -1) {
+                    bars[bar].temps[i] = nextTemps[i];
+                } else {
+                    bars[bar].temps[i] = bars[bar].temps[i];
+                }
+            }
+        }
+        
+        if (bars[bar].globalLimit!= null)
+        {
+            for (temp in nextTemps)
+            {
+                if (nextTemps[temp] > bars[bar].globalLimit)
+                {
+                    limit_exceeded = true;
+                }
+            }
+        }
+        
+        for (goal in bars[bar].goals)
+        {
+            if (bars[bar].temps[bars[bar].goals[goal].pos] != bars[bar].goals[goal].temp)
+            {
+                goal_reached = false;
             }
         }
         nextTemps = [];
     } 
+    
+    return ({limit_exceeded:limit_exceeded, goal_reached:goal_reached});
 }
 
 // Used to update temperatures that cross between bars
