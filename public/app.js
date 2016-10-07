@@ -16,6 +16,9 @@ app.controller('mainController', function($scope, socket) {
     $scope.description = true;
     $scope.navDepth = 0;
     $scope.score = 0;
+    $scope.goal_reached = false;
+    $scope.limit_exceeded = false;
+    
     // --- requests room change from the server ----//
     $scope.changeRoom = function(room){
         console.log("ChangeRoom Request::" +  room);
@@ -39,7 +42,7 @@ app.controller('mainController', function($scope, socket) {
         {
             socket.emit("Leave Room");
             socket.emit("Start Rooms", $scope.stlye);
-            $scope.template = "./partials/" + $scope.stlye + ".html";
+            $scope.template = "./partials/" + $scope.style + ".html";
             $scope.descrURL = "./partials/descriptions/"+ $scope.style + ".html";
             $scope.room = null;
             $scope.description = true;
@@ -64,10 +67,13 @@ app.controller('mainController', function($scope, socket) {
             socket.emit($scope.style + " room", choice);
             console.log($scope.style + " room");
         }
+        
+        console.log("scope.style: " + $scope.style);
+        console.log($scope.template);
+        console.log($scope.descrURL);
     }
     
     $scope.vote = function(){
-        console.log($scope.variableVals);
         
         var votes = [];
         for (vv in $scope.variableVals)
@@ -88,6 +94,13 @@ app.controller('mainController', function($scope, socket) {
         {temps:$scope.variableVals[index].variables, bar:index});
     }
     
+    socket.on("alerts", function(data){
+        console.log("Alerts");
+        console.log(data);
+        $scope.limit_exceeded = data.limit_exceeded;
+        $scope.goal_reached = data.goal_reached;
+    });
+    
     // ----- sets up a new room --- //
     socket.on('init', function (data) {
 
@@ -98,13 +111,13 @@ app.controller('mainController', function($scope, socket) {
         $scope.variableVals = [];
         
         // ---- Constructs a list of variable heat sources, to allow user updates. --- //
+        console.log(data);
         for (var j = 0; j < data.bars.length; j++){
             
             var newArray = [];
             console.log(data.bars[j]);
             if (!(data.bars[j].variable == null)) {
-                console.log(j);
-                console.log(data.bars[j].variable);
+                console.log("Doing variable Vals");
                 for (var i = 0; i < data.bars[j].variable.length; i++){  
                     var variable = data.bars[j].variable[i];
                     newArray.push({pos: variable.pos, temp: variable.temp   })
@@ -124,7 +137,6 @@ app.controller('mainController', function($scope, socket) {
                $scope.bars[i].points[j] = data.bars[i].points[j];
            }
        }
-       console.log(data);
        $scope.score = data.score;
        $scope.time += data.elapsedTime;
     });

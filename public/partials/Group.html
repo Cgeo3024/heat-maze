@@ -34,3 +34,7 @@
 <div class="outerdiv">
     <button ng-click="vote()">Vote for these settings</button>
 </div>
+<div class="outerdiv">
+    <span ng-if="goal_reached == true"> Congratulations! You have achieved this room's goal! </span>
+    <span ng-if="limit_exceeded == true"> Warning! You have exceeded this room's temperature limits </span>
+</div>

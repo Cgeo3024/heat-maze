@@ -69,11 +69,13 @@ io.on('connection', function(socket){
 
         thisUser.solo = true;
         thisUser.handle = setInterval(function() {
-           iterateRoom(thisUser.room);
+           var alerts = iterateRoom(thisUser.room);
            var summary = summarize(thisUser.room);
            socket.emit("update bars", {bars: summary.bars, elapsedTime : timeGap});
+           socket.emit("alerts", alerts);
            },
            timeGap);
+           
     });
     
     socket.on("Group room", function(choice)
@@ -100,9 +102,10 @@ io.on('connection', function(socket){
         if (groupRoom.users.length <= 1)
         {
             groupRoom.tickHandle = setInterval(function() {
-                iterateRoom(groupRoom.room);
+                var alerts = iterateRoom(groupRoom.room);
                 var summary = summarize(groupRoom.room);
                 io.to(groupRoom.name).emit("update room", {details: summary, elapsedTime : timeGap});
+                io.to(groupRoom.name).emit("alerts", alerts);
             },
             timeGap);
             
@@ -299,10 +302,12 @@ function summarize(room)
 
 
 function iterateRoom(room){
-    iterateBars(room.bars);
+    var alerts = iterateBars(room.bars);
     if (room.joins != null){
         iterateJoins(room.bars, room.joins);
     }
+    
+    return alerts;
 }
 
 function initRoom(roomType)
@@ -373,7 +378,7 @@ function initBars(roomType){
     }
     if (roomType == "B")
     {
-        var newBar = initBar("A", 10, "Cu", 15, 5);
+        var newBar = initBar("A", 10, "Cu", 25, 5);
         
         newBar.fixed    = [0];
         newBar.variable = [0];
@@ -385,8 +390,8 @@ function initBars(roomType){
     {
         var newBar = initBar("A", 10, "Fe", 15, 5);
         
-        newBar.fixed    = [0, 9];
-        
+        newBar.fixed    = [0];
+        newBar.variable = [0];
         bars.push(newBar);
         
         var newBar = initBar("B", 5, "Sn", 15, 5);
