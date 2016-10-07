@@ -140,9 +140,9 @@ io.on('connection', function(socket){
         
         var thisUser = getUser(socket.id)
         
-        if (user.solo == false)
+        if (thisUser.solo == false)
         {
-            vote(user, data);
+            vote(thisUser, data);
             return;
         }        
         for (var i = 0; i < data.temps.length; i++){
@@ -444,14 +444,14 @@ function divideBar(length, divisions)
     points = [];
     
     if (divisions > 0){
-        var increment = length/divisions;
+        var increment = (length -1)/(divisions -1);
         
         var i = 0;
         var pos = 0;
         
 
         // dividing the bar stops if we run out of bar or divisions
-        while ( i < divisions && pos < length)
+        while ( i <= divisions && pos < length)
         {
             points.push(Math.floor(pos));
             
