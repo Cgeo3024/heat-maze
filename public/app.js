@@ -149,9 +149,10 @@ app.controller('mainController', function($scope, socket) {
                 console.log("Doing variable Vals");
                 for (var i = 0; i < data.bars[j].variable.length; i++){  
                     var variable = data.bars[j].variable[i];
-                    newArray.push({pos: variable.pos, temp: variable.temp   })
+                    newArray.push({pos: variable.pos, temp: variable.temp, options: variable.options})
                 }
             }
+            console.log(newArray);
             $scope.variableVals.push({bar: j, variables:newArray});
         }
 

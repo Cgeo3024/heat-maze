@@ -341,7 +341,7 @@ function summarize(room)
             for (var j = 0; j < bar.variable.length; j++)
             {
                 var pos = bar.variable[j].pos
-                summBar.variable.push({pos: pos, temp: bar.temps[pos]})
+                summBar.variable.push({pos: pos, temp: bar.temps[pos], options: bar.variable[j].options})
             }
         }
         bars.push(summBar);
