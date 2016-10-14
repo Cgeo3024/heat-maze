@@ -51,6 +51,11 @@ io.on('connection', function(socket){
     
     users.push({id: socket.id, bars:null, handle: null});
     
+    socket.on("Leave Room", function()
+    {
+        disconnect_socket_rooms(socket.id);
+    });
+    
     socket.on("Solo room", function(choice)
     {
         console.log("user " + socket.id +" switched to " + choice);
@@ -101,6 +106,7 @@ io.on('connection', function(socket){
         
         if (groupRoom.users.length <= 1)
         {
+            console.log("Setting Handle");
             groupRoom.tickHandle = setInterval(function() {
                 var alerts = iterateRoom(groupRoom.room);
                 var summary = summarize(groupRoom.room);
@@ -154,6 +160,7 @@ io.on('connection', function(socket){
     
     socket.on('disconnect', function(){
         console.log(socket.id + " has left");
+        disconnect_socket_rooms(socket.id);
         var thisUser = null;
         var index = -1;
         for (user in users){
@@ -176,7 +183,51 @@ io.on('connection', function(socket){
     });
 });
 
-
+function disconnect_socket_rooms(socketID)
+{
+    var thisUser = getUser(socketID);
+    var usersRoom = getGroupRoom(thisUser.room);
+    
+    // skip these steps if it is a group room
+    if(groupRoomNames.indexOf(thisUser.room) == -1)
+    {
+        console.log(thisUser);
+        clearInterval(thisUser.handle);
+        thisUser.room = null;
+        
+        console.log(thisUser);
+    }
+    else
+    {
+        console.log(usersRoom);
+        console.log(thisUser);
+        var index = -1;
+        
+        for (user in usersRoom.users)
+        {
+            if(usersRoom.users[user].id == socketID)
+            {
+                index = user;
+            }
+        }
+        
+        if(index > -1)
+        {
+            usersRoom.users.splice(index, 1);
+            
+        }
+        
+        if (usersRoom.users.length < 1)
+        {
+            clearInterval(usersRoom.tickHandle);
+            clearInterval(usersRoom.voteHandle);
+        }
+        thisUser.room = null;
+        console.log(usersRoom);
+        console.log(thisUser);
+    }
+        
+}
 function getMedian(data) {
     
     var midpoint = Math.floor((data.length - 1) / 2);
@@ -188,8 +239,7 @@ function getMedian(data) {
 }
 
 function resolveVotes(room){
-    
-
+   
     var talley = [];
     for ( bar  in room.room.bars)
     {   

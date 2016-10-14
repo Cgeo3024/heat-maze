@@ -141,6 +141,20 @@ app.controller('mainController', function($scope, socket) {
        $scope.time += data.elapsedTime;
     });
     
+    // this is a more comprehensive method including victory condition handling //
+    socket.on('update room', function(data){
+       var bars = data.details.bars;
+       for (i = 0; i < bars.length; i++){
+           
+           for (j = 0; j < bars[i].points.length; j++){
+               
+               $scope.bars[i].points[j] = bars[i].points[j];
+           }
+       }
+       $scope.score = data.details.score;
+       $scope.time += data.elapsedTime;
+    });
+    
     //------------used for group rooms ------//
     socket.on('new user', function (data){
         $socket.users.append(data);
