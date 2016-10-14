@@ -20,7 +20,7 @@ app.controller('mainController', function($scope, socket) {
     $scope.vol = 90;
     var canvas = null;
     var context;
-    
+    var thickness =10;
     // --- requests room change from the server ----//
     $scope.changeRoom = function(room){
         console.log("ChangeRoom Request::" +  room);
@@ -35,16 +35,17 @@ app.controller('mainController', function($scope, socket) {
     }
     
     function draw() {
+        console.log("BARS");
         if (canvas.getContext) {
+            var drawn = [];
             var ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             var thickness = 10;
             console.log($scope.bars);
             for (bar in $scope.bars)
             {
-                ctx.fillStyle = "rgb(200,0,0)";
-                ctx.fillRect(thickness * (bar + 1), 10, 
-                        $scope.bars[bar].points[$scope.bars[bar].points.length -1].pos
-                        * thickness, thickness);
+                drawBar(ctx, bar, drawn);
+               
             }
             
             /*ctx.fillRect (10, 10, 50, 50);
@@ -53,7 +54,58 @@ app.controller('mainController', function($scope, socket) {
             ctx.fillRect (30, 30, 50, 50); */
         }
     }
-
+    
+    function drawBar(ctx, bar, drawn, horizontal=false, startX=0, startY=0)
+    {
+        
+        console.log($scope.bars);
+        console.log("Drawing bar : " + bar)
+        // only draw bars not already drawn
+        if (drawn.indexOf(bar) < 0)
+        {
+            drawn.push(bar);
+            ctx.fillStyle = "rgb(200,0,0)";
+            console.log("Starting at : X, Y: " + startX + " " + startY);
+            console.log("horizontal: " + horizontal);
+            if (horizontal)
+            {
+                ctx.fillRect(startX, startY, $scope.bars[bar].points[$scope.bars[bar].points.length -1].pos
+                * thickness,
+                thickness);
+            }
+            else
+            {
+                ctx.fillRect(startY, startX, 
+                thickness,
+                $scope.bars[bar].points[$scope.bars[bar].points.length -1].pos
+                * thickness);
+            }
+            
+            console.log($scope.bars[bar].points[$scope.bars[bar].points.length -1].pos
+                * thickness);
+            var orientation = !horizontal;  
+            
+            for (join in $scope.bars[bar].joins)
+            {
+                console.log("Drawing Join");
+                
+                var newX;
+                var newY;
+                if (!horizontal)
+                {
+                    newX = startX.
+                    newY = startY + $scope.bars[bar].joins[join].pos * thickness;
+                }
+                else
+                {
+                    
+                }
+                drawBar(ctx, $scope.bars[bar].joins[join].next.bar, drawn, orientation, startX,
+                startY + $scope.bars[bar].joins[join].pos * thickness);
+                
+            }
+        }
+    }
     $scope.back = function(){
         
         console.log("NavDepth " + $scope.navDepth);

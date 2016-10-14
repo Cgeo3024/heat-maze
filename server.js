@@ -344,6 +344,10 @@ function summarize(room)
                 summBar.variable.push({pos: pos, temp: bar.temps[pos], options: bar.variable[j].options})
             }
         }
+        
+        if (bar.joins != null){
+            summBar.joins = bar.joins;
+        }
         bars.push(summBar);
     }
     
@@ -354,7 +358,7 @@ function summarize(room)
 
 
 function iterateRoom(room){
-    var alerts = iterateBars(room.bars);
+    var alerts = iterateBars(room.bars, room.roomTemp);
     if (room.joins != null){
         iterateJoins(room.bars, room.joins);
     }
@@ -381,18 +385,22 @@ function initRoom(roomType)
         newRoom.bars=initBars("C");
         newRoom.roomTemp = 25;
         
-        newRoom.joins = [];
-        newRoom.joins.push({sideA: {bar: 0, pos: 9}, sideB: {bar: 1, pos: 2}, temp: 15});
+        addJoin(newRoom, {bar: 0, pos: 9}, {bar: 1, pos: 2});
     }
     if (roomType == "D")
     {
         newRoom.bars=initBars("D");
         newRoom.roomTemp = 25;
+
+        addJoin(newRoom, {bar: 0, pos: 4}, {bar: 2, pos: 0})
+        addJoin(newRoom, {bar: 2, pos: 2}, {bar: 1, pos: 1})
         
-        newRoom.joins = [];
-        newRoom.joins.push({sideA: {bar: 0, pos: 4}, sideB: {bar: 2, pos: 0}, temp: 15});
-        newRoom.joins.push({sideA: {bar: 2, pos: 2}, sideB: {bar: 1, pos: 1}, temp: 15});
-        
+        /*newRoom.joins.push({sideA: {bar: 0, pos: 4}, sideB: {bar: 2, pos: 0}, temp: 15});
+        newRoom.joins.push({sideA: {bar: 2, pos: 2}, sideB: {bar: 1, pos: 1}, temp: 15}); */
+        console.log(newRoom);
+        console.log(newRoom.bars);
+        console.log(newRoom.bars[0]);
+        console.log(newRoom.bars[2]);
     }
     if (roomType == "Group_Easy")
     {
@@ -403,9 +411,14 @@ function initRoom(roomType)
     {
         newRoom.bars=initBars("D");
         newRoom.roomTemp = 25;
-        newRoom.joins = [];
         
-        newRoom.joins.push({sideA: {bar: 0, pos: 2}, sideB: {bar: 1, pos: 2}, temp: 15});
+       
+        addJoin(newRoom, {bar: 0, pos: 2}, {bar: 1, pos: 2})
+        console.log(newRoom);
+        console.log(newRoom.bars);
+        console.log(newRoom.bars[0]);
+        console.log(newRoom.bars[1]);
+        //newRoom.joins.push({sideA: {bar: 0, pos: 2}, sideB: {bar: 1, pos: 2}, temp: 15});
     }
     if (roomType == "Group_Hard")
     {
@@ -415,6 +428,21 @@ function initRoom(roomType)
     return newRoom;
 }
 
+function addJoin(room, sideA, sideB)
+{
+    var sides = [sideA, sideB];
+    for (side in sides)
+    {   
+        var thisSide = sides[side];
+        var thatSide = sides[sides.length - side - 1];
+        if (room.bars[thisSide.bar].joins == null)
+        {
+            room.bars[thisSide.bar].joins = [];
+        }
+        
+        room.bars[thisSide.bar].joins.push({pos: thisSide.pos, next: thatSide});
+    }
+}
 function initBars(roomType){
     var bars = [];
     if (roomType == "A")
@@ -516,7 +544,7 @@ function divideBar(length, divisions)
 }
 // iterates temperature changes along a bar.
 // CURENTLY NOT COMPLETE FOR THE EXTREME ENDS OF BARS
-function iterateBars(bars){
+function iterateBars(bars, roomTemp){
     
     var goal_reached = true;
     var limit_exceeded = false;
@@ -531,12 +559,12 @@ function iterateBars(bars){
             
             if (i == 0){
                 secondDerivTX = 
-                (-bars[bar].temps[i] + bars[bar].temps[i + 1])/(barDelta*barDelta/1000000);
+                (- 2*bars[bar].temps[i] + bars[bar].temps[i + 1] +roomTemp)/(barDelta*barDelta/1000000);
             } 
             else if (i == bars[bar].temps.length -1)
             {
                 secondDerivTX = 
-                (bars[bar].temps[i -1] -bars[bar].temps[i])/(barDelta*barDelta/1000000);
+                (bars[bar].temps[i -1] - 2*bars[bar].temps[i] +roomTemp)/(barDelta*barDelta/1000000);
             }
             else 
             {
