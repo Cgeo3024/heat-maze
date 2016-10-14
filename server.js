@@ -109,6 +109,7 @@ io.on('connection', function(socket){
             console.log("Setting Handle");
             groupRoom.tickHandle = setInterval(function() {
                 var alerts = iterateRoom(groupRoom.room);
+                groupRoom.room.score += 1;
                 var summary = summarize(groupRoom.room);
                 io.to(groupRoom.name).emit("update room", {details: summary, elapsedTime : timeGap});
                 io.to(groupRoom.name).emit("alerts", alerts);
@@ -327,7 +328,6 @@ function summarize(room)
         var summBar = {};
         
         summBar.points = [];
-        
         var bar = room.bars[i]
         
         for (var j = 0; j < bar.watchPoints.length; j++)
@@ -347,7 +347,9 @@ function summarize(room)
         bars.push(summBar);
     }
     
-    return {room: "~", bars:bars, score:room.score};
+    
+    
+    return {room: "~", bars:bars, score:room.score, joins:room.joins};
 }
 
 

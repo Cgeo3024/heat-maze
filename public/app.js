@@ -2,7 +2,6 @@ var app = angular.module('HeatMazeApp',[]);
 
 app.controller('mainController', function($scope, socket) {
     
-    
     // ---- Solo User Room Constants --- //
     $scope.navChoices = ["Group", "Solo"];
     $scope.users = [];
@@ -18,6 +17,8 @@ app.controller('mainController', function($scope, socket) {
     $scope.score = 0;
     $scope.goal_reached = false;
     $scope.limit_exceeded = false;
+    var canvas = null;
+    var context;
     
     // --- requests room change from the server ----//
     $scope.changeRoom = function(room){
@@ -26,6 +27,32 @@ app.controller('mainController', function($scope, socket) {
         socket.emit("switch room", ("Solo_"+room));
     }
     
+    function initializeCanvas(){
+        canvas = document.getElementById('barView');
+        context = canvas.getContext('2d');
+        draw();
+    }
+    
+    function draw() {
+        if (canvas.getContext) {
+            var ctx = canvas.getContext("2d");
+            var thickness = 10;
+            console.log($scope.bars);
+            for (bar in $scope.bars)
+            {
+                ctx.fillStyle = "rgb(200,0,0)";
+                ctx.fillRect(thickness * (bar + 1), 10, 
+                        $scope.bars[bar].points[$scope.bars[bar].points.length -1].pos
+                        * thickness, thickness);
+            }
+            
+            /*ctx.fillRect (10, 10, 50, 50);
+
+            ctx.fillStyle = "rgba(0, 0, 200, 0.5)";
+            ctx.fillRect (30, 30, 50, 50); */
+        }
+    }
+
     $scope.back = function(){
         
         console.log("NavDepth " + $scope.navDepth);
@@ -45,6 +72,7 @@ app.controller('mainController', function($scope, socket) {
             $scope.template = "./partials/" + $scope.style + ".html";
             $scope.descrURL = "./partials/descriptions/"+ $scope.style + ".html";
             $scope.room = null;
+            canvas = null;
             $scope.description = true;
         }
         
@@ -125,7 +153,7 @@ app.controller('mainController', function($scope, socket) {
             }
             $scope.variableVals.push({bar: j, variables:newArray});
         }
-        
+
     });
     
     // updates the temperature values
@@ -139,6 +167,11 @@ app.controller('mainController', function($scope, socket) {
        }
        $scope.score = data.score;
        $scope.time += data.elapsedTime;
+       
+       if (canvas == null)
+       {
+           initializeCanvas();
+       }
     });
     
     // this is a more comprehensive method including victory condition handling //
@@ -169,6 +202,8 @@ app.controller('mainController', function($scope, socket) {
     });
 });
 
+
+      
 // This factory wraps the socket.io functionality to 
 // allow access to it within the angular controller
 app.factory('socket', function ($rootScope) {

@@ -51,8 +51,11 @@ ul {
 
               <div id="timer"> Elapsed Time (seconds) : {{time/100| number:0}}</div>
             </div>
-            <div ng-include="template"></div>
             
+            <canvas id="barView">
+                
+            </canvas>
+            <div ng-include="template"></div>
         </div>
         
         <div ng-if="description == true" ng-include="descrURL">
