@@ -340,7 +340,7 @@ function summarize(room)
             summBar.variable = []
             for (var j = 0; j < bar.variable.length; j++)
             {
-                var pos = bar.variable[j]
+                var pos = bar.variable[j].pos
                 summBar.variable.push({pos: pos, temp: bar.temps[pos]})
             }
         }
@@ -423,7 +423,7 @@ function initBars(roomType){
         var newBar = initBar("A", 15, "Cu", 20, 5);
         
         newBar.fixed    = [0];
-        newBar.variable = [0];
+        newBar.variable = [{pos: 0, options: {floor: 20, ceil:120}}];
         newBar.goals=[{pos:14, temp:30}];        
         bars.push(newBar);
         
@@ -433,7 +433,7 @@ function initBars(roomType){
         var newBar = initBar("A", 10, "Cu", 25, 5);
         
         newBar.fixed    = [0];
-        newBar.variable = [0];
+        newBar.variable = [{pos: 0, options: {floor: 20, ceil:120}}];
         newBar.goals=[{pos:9, temp:25}]; 
         newBar.globalLimit = 60;
         bars.push(newBar);
@@ -443,7 +443,7 @@ function initBars(roomType){
         var newBar = initBar("A", 10, "Fe", 15, 5);
         
         newBar.fixed    = [0];
-        newBar.variable = [0];
+        newBar.variable = [{pos: 0, options: {floor: 20, ceil:120}}];
         bars.push(newBar);
         
         var newBar = initBar("B", 5, "Sn", 15, 5);
@@ -457,12 +457,12 @@ function initBars(roomType){
         var newBar = initBar("A", 10, "Cu", 15, 5);
         newBar.goals = [{pos:9, temp:10}];
         newBar.fixed    = [0];
-        newBar.variable = [0];
+        newBar.variable = [{pos: 0, options: {floor: 20, ceil:120}}];
         bars.push(newBar);
         
         var newBar = initBar("B", 6, "Fe", 15, 5);
         newBar.fixed    = [5];
-        newBar.variable = [5];
+        newBar.variable = [{pos: 5, options: {floor: 20, ceil:120}}];
         bars.push(newBar);
         
         var newBar = initBar("C", 3, "Cu", 15, 5);

@@ -36,14 +36,15 @@ ul {
 <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.7/angular.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
-
+    <link rel="stylesheet" type="text/css" href="./slider/rzslider.min.css"/>
+<script src="./slider/rzslider.min.js"></script>
 <script src="app.js"</script>
 <script src="Chart.js"></script>
 
 </head>
 <body ng-app="HeatMazeApp">
     <div ng-controller="mainController">
-        
+
         <button ng-if="navDepth > 0" ng-click="back()"> Back </button>
         <!--<div ng-include="template"></div>-->
         <div ng-if="room != null">

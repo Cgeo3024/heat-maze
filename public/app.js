@@ -1,4 +1,4 @@
-var app = angular.module('HeatMazeApp',[]);
+var app = angular.module('HeatMazeApp',['rzModule']);
 
 app.controller('mainController', function($scope, socket) {
     
@@ -17,6 +17,7 @@ app.controller('mainController', function($scope, socket) {
     $scope.score = 0;
     $scope.goal_reached = false;
     $scope.limit_exceeded = false;
+    $scope.vol = 90;
     var canvas = null;
     var context;
     

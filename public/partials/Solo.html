@@ -14,11 +14,12 @@
         </table>
         <div ng-if="variableVals[$index].variables.length > 0">
             Set Variable Heat Sources Temperatures
-            <div ng-repeat="pos in variableVals[$index].variables">
-            Position: {{pos.pos}}
-                <input type="number" name="input" ng-model="pos.temp">
-                </input>
-                
+            <div ng-repeat="variable in variableVals[$index].variables">
+            Position: {{variable.pos}}
+                <rzslider
+                     rz-slider-model="variable.temp"
+                     rz-slider-options="{floor: 0, ceil: 450}">
+                </rzslider>
             </div>
             
             <button ng-click="updateSource($index)">Update </button>
