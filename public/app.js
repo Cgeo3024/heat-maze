@@ -21,6 +21,7 @@ app.controller('mainController', function($scope, socket) {
     var canvas = null;
     var context;
     var thickness =10;
+    var drawn = [];
     // --- requests room change from the server ----//
     $scope.changeRoom = function(room){
         console.log("ChangeRoom Request::" +  room);
@@ -37,14 +38,14 @@ app.controller('mainController', function($scope, socket) {
     function draw() {
         console.log("BARS");
         if (canvas.getContext) {
-            var drawn = [];
             var ctx = canvas.getContext("2d");
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             var thickness = 10;
             console.log($scope.bars);
             for (bar in $scope.bars)
             {
-                drawBar(ctx, bar, drawn);
+                console.log(bar);
+                drawBar(ctx, bar);
                
             }
             
@@ -55,14 +56,17 @@ app.controller('mainController', function($scope, socket) {
         }
     }
     
-    function drawBar(ctx, bar, drawn, horizontal=false, startX=0, startY=0)
+    function drawBar(ctx, bar,horizontal=false, startX=0, startY=0)
     {
-        
-        console.log($scope.bars);
-        console.log("Drawing bar : " + bar)
+        console.log(bar);
+        bar = parseInt(bar);
         // only draw bars not already drawn
+        console.log("Drawn index " + drawn.indexOf(bar));
         if (drawn.indexOf(bar) < 0)
         {
+            console.log("Drawing bar : " + bar + " At X: " + startX + " and Y: " + startY);
+            console.log(drawn);
+            console.log(bar);
             drawn.push(bar);
             ctx.fillStyle = "rgb(200,0,0)";
             console.log("Starting at : X, Y: " + startX + " " + startY);
@@ -88,7 +92,7 @@ app.controller('mainController', function($scope, socket) {
             for (join in $scope.bars[bar].joins)
             {
                 console.log("Drawing Join");
-                
+                console.log($scope.bars[bar].joins[join])
                 var newX;
                 var newY;
                 if (!horizontal)
@@ -98,10 +102,13 @@ app.controller('mainController', function($scope, socket) {
                 }
                 else
                 {
-                    
+                    newX = startX + $scope.bars[bar].joins[join].pos * thickness;
+                    newY = startY - $scope.bars[bar].joins[join].next.pos;
                 }
-                drawBar(ctx, $scope.bars[bar].joins[join].next.bar, drawn, orientation, startX,
-                startY + $scope.bars[bar].joins[join].pos * thickness);
+                console.log(newY);
+                console.log(newX);
+                drawBar(ctx, $scope.bars[bar].joins[join].next.bar, orientation, newY,
+                newX);
                 
             }
         }
@@ -126,6 +133,7 @@ app.controller('mainController', function($scope, socket) {
             $scope.descrURL = "./partials/descriptions/"+ $scope.style + ".html";
             $scope.room = null;
             canvas = null;
+            drawn = [];
             $scope.description = true;
         }
         
