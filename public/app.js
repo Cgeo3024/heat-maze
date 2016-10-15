@@ -59,6 +59,7 @@ app.controller('mainController', function($scope, socket) {
     function drawBar(ctx, bar,horizontal=false, startX=0, startY=0)
     {
         console.log(bar);
+        console.log($scope.bars);
         bar = parseInt(bar);
         // only draw bars not already drawn
         console.log("Drawn index " + drawn.indexOf(bar));
@@ -68,7 +69,7 @@ app.controller('mainController', function($scope, socket) {
             console.log(drawn);
             console.log(bar);
             drawn.push(bar);
-            ctx.fillStyle = "rgb(200,0,0)";
+            ctx.fillStyle = "grey";
             console.log("Starting at : X, Y: " + startX + " " + startY);
             console.log("horizontal: " + horizontal);
             if (horizontal)
@@ -79,7 +80,7 @@ app.controller('mainController', function($scope, socket) {
             }
             else
             {
-                ctx.fillRect(startY, startX, 
+                ctx.fillRect(startX, startY, 
                 thickness,
                 $scope.bars[bar].points[$scope.bars[bar].points.length -1].pos
                 * thickness);
@@ -88,6 +89,31 @@ app.controller('mainController', function($scope, socket) {
             console.log($scope.bars[bar].points[$scope.bars[bar].points.length -1].pos
                 * thickness);
             var orientation = !horizontal;  
+            console.log("orientation is : " + orientation + "When horizontal is " + horizontal);
+            ctx.fillStyle="blue";
+            ctx.fillStyle="red";
+            console.log($scope.bars[bar].variable)
+            for (variable in $scope.bars[bar].variable)
+            {
+                var thisVar = $scope.bars[bar].variable[variable];
+                console.log("Drawing variable position of " + bar);
+                console.log("Horizontal is " + horizontal);
+                if (horizontal)
+                {
+                    ctx.fillRect(startX + thisVar.pos * thickness,
+                        startY,
+                    thickness,
+                    thickness);
+                }
+                else
+                {
+                    ctx.fillRect(startX, startY + thisVar.pos * thickness, 
+                    thickness,
+                    thickness);
+                }
+            }
+            ctx.fillStyle="green";
+            
             
             for (join in $scope.bars[bar].joins)
             {
@@ -95,20 +121,21 @@ app.controller('mainController', function($scope, socket) {
                 console.log($scope.bars[bar].joins[join])
                 var newX;
                 var newY;
-                if (!horizontal)
+                if (horizontal)
                 {
-                    newX = startX.
-                    newY = startY + $scope.bars[bar].joins[join].pos * thickness;
+                    newX = startX + ($scope.bars[bar].joins[join].pos * thickness);
+                    newY = startY - ($scope.bars[bar].joins[join].next.pos);
+                    
                 }
                 else
                 {
-                    newX = startX + $scope.bars[bar].joins[join].pos * thickness;
-                    newY = startY - $scope.bars[bar].joins[join].next.pos;
+                    newX = startX;
+                    newY = startY + ($scope.bars[bar].joins[join].pos * thickness);
                 }
                 console.log(newY);
                 console.log(newX);
-                drawBar(ctx, $scope.bars[bar].joins[join].next.bar, orientation, newY,
-                newX);
+                drawBar(ctx, $scope.bars[bar].joins[join].next.bar, orientation, newX,
+                newY);
                 
             }
         }
