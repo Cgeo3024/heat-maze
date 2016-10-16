@@ -27,9 +27,6 @@ ul {
     border: 1px black solid;
 }
 
-.navButton{
-    
-}
 </style>
 
 
@@ -50,7 +47,7 @@ ul {
         <div ng-if="room != null">
             <div class="outerdiv">
 
-              <div id="timer"> Elapsed Time (seconds) : {{time/100| number:0}}</div>
+              <div id="timer"> Time Left: (seconds) : {{time / 1000| number:0}}</div>
             </div>
             
             <canvas id="barView" width=800 height=300>

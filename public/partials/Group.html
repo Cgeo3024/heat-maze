@@ -18,7 +18,7 @@
             </tr>
             <tr ng-repeat="point in bar.points track by $index">
                 <td>{{point.pos}}</td>
-                <td>{{point.temp| number:0}}</td>
+                <td>{{point.temp| number:0.1}}</td>
             </tr>
         </table>
         <div ng-if="variableVals[$index].variables.length > 0">
@@ -30,6 +30,23 @@
                      rz-slider-options="variable.options">
                 </rzslider>
             </div>
+        </div>
+        
+        <div ng-if="bar.goals != null">
+            Your temperature goals for this bar are:
+            <table>
+                <tr>
+                    <th>Position</th>
+                    <th> Goal Temperature  </th>
+                    <th> Current Temperature </th>
+                </tr>
+                <tr ng-repeat="goal in bar.goals">
+                    <td class="complete">{{goal.pos}}</td>
+                    <td>{{goal.temp}}</td>
+                    <td ng-class="{'complete' : goal.complete}">{{goal.actual| number:0.1}}</td>
+                </tr>
+                
+            </table>
         </div>
     </div>
 </div>

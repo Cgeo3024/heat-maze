@@ -17,6 +17,7 @@ app.get('/', function(req, res){
     res.sendFile(__dirname + 'index.html');
 });
 
+var timeLimitMins = 10;
 var GroupRooms = [];
 var barDelta = 5;
 var timeGap = 5;
@@ -36,7 +37,7 @@ function InitGroupRooms(){
         newRoom.name = groupRoomNames[i];
         newRoom.users = [];
         newRoom.room = initRoom("Group_" + groupRoomNames[i]);
-        
+        newRoom.timeLeft = 
         GroupRooms.push(newRoom);
     }
 }
@@ -105,14 +106,22 @@ io.on('connection', function(socket){
         var initVals = summarize(groupRoom.room);
         
         if (groupRoom.users.length <= 1)
-        {
+        {   
+            groupRoom.endTime = Date.now() + (timeLimitMins * 60 * 1000);
             console.log("Setting Handle");
             groupRoom.tickHandle = setInterval(function() {
                 var alerts = iterateRoom(groupRoom.room);
                 groupRoom.room.score += 1;
                 var summary = summarize(groupRoom.room);
-                io.to(groupRoom.name).emit("update room", {details: summary, elapsedTime : timeGap});
+                io.to(groupRoom.name).emit("update room", {details: summary, elapsedTime : timeGap, timeLeft : groupRoom.endTime - Date.now()});
                 io.to(groupRoom.name).emit("alerts", alerts);
+                
+                if (Date.now() >= groupRoom.endTime)
+                {
+                    clearInterval(groupRoom.tickHandle);
+                    clearInterval(groupRoom.voteHandle);
+                    io.to(groupRoom.name).emit("Time Finished");
+                }
             },
             timeGap);
             
@@ -181,6 +190,8 @@ io.on('connection', function(socket){
         
         var thisUser = getUser(socket.id);
         thisUser.vote = votes;
+        console.log("User vote recieved");
+        console.log(thisUser.vote);
     });
 });
 
@@ -192,16 +203,12 @@ function disconnect_socket_rooms(socketID)
     // skip these steps if it is a group room
     if(groupRoomNames.indexOf(thisUser.room) == -1)
     {
-        console.log(thisUser);
         clearInterval(thisUser.handle);
         thisUser.room = null;
-        
-        console.log(thisUser);
     }
     else
     {
-        console.log(usersRoom);
-        console.log(thisUser);
+
         var index = -1;
         
         for (user in usersRoom.users)
@@ -224,8 +231,7 @@ function disconnect_socket_rooms(socketID)
             clearInterval(usersRoom.voteHandle);
         }
         thisUser.room = null;
-        console.log(usersRoom);
-        console.log(thisUser);
+
     }
         
 }
@@ -241,6 +247,7 @@ function getMedian(data) {
 
 function resolveVotes(room){
    
+   
     var talley = [];
     for ( bar  in room.room.bars)
     {   
@@ -248,7 +255,7 @@ function resolveVotes(room){
         for(v in room.room.bars[bar].variable)
         {
             
-            talley[bar].push({pos:room.room.bars[bar].variable[v], values:[]});
+            talley[bar].push({pos:room.room.bars[bar].variable[v].pos, values:[]});
         }
     }
     
@@ -257,7 +264,8 @@ function resolveVotes(room){
     {   
 
         var thisVote = room.users[i].vote;
-        
+        console.log("We have a vote:");
+        console.log(thisVote);
         if(room.users[i].vote != null)
         {
             voteCount += 1;
@@ -265,13 +273,13 @@ function resolveVotes(room){
         
         for (bar in thisVote)
         {
-            for (point in thisVote[bar].variables)
+            for (point in thisVote[bar].values)
             {
-                console.log(thisVote[bar].variables[point]);
+                console.log(thisVote[bar].values[point]);
                 console.log(talley[thisVote[bar].bar][point]);
-                if (thisVote[bar].variables[point].pos == talley[thisVote[bar].bar][point].pos)
+                if (thisVote[bar].values[point].pos == talley[thisVote[bar].bar][point].pos)
                 {
-                    talley[thisVote[bar].bar][point].values.push(thisVote[bar].variables[point].temp);
+                    talley[thisVote[bar].bar][point].values.push(thisVote[bar].values[point].temp);
                 }
             }
         }
@@ -328,27 +336,45 @@ function summarize(room)
         var summBar = {};
         
         summBar.points = [];
-        var bar = room.bars[i]
+        var bar = room.bars[i];
         
         for (var j = 0; j < bar.watchPoints.length; j++)
         {
-            var pos = bar.watchPoints[j]
-            summBar.points.push({pos: pos, temp: bar.temps[pos]})
+            var pos = bar.watchPoints[j];
+            summBar.points.push({pos: pos, temp: bar.temps[pos]});
         }
         
         if (bar.variable != null) {
-            summBar.variable = []
+            summBar.variable = [];
             for (var j = 0; j < bar.variable.length; j++)
             {
-                var pos = bar.variable[j].pos
-                summBar.variable.push({pos: pos, temp: bar.temps[pos], options: bar.variable[j].options})
+                var pos = bar.variable[j].pos;
+                summBar.variable.push({pos: pos, temp: bar.temps[pos], options: bar.variable[j].options});
             }
         }
         
         if (bar.joins != null){
             summBar.joins = bar.joins;
         }
+        
+        summBar.id = bar.id;
+        summBar.material = bar.material;
+        
+        if (bar.goals != null)
+        {
+            summBar.goals = [];
+            for (goal in bar.goals)
+            {
+                var newGoal = bar.goals[goal];
+                newGoal.actual = bar.temps[newGoal.pos];
+                summBar.goals.push(newGoal);
+
+            }            
+        }
+        
+        
         bars.push(summBar);
+        
     }
     
     
@@ -359,10 +385,6 @@ function summarize(room)
 
 function iterateRoom(room){
     var alerts = iterateBars(room.bars, room.roomTemp);
-    if (room.joins != null){
-        iterateJoins(room.bars, room.joins);
-    }
-    
     return alerts;
 }
 
@@ -378,7 +400,7 @@ function initRoom(roomType)
     if (roomType == "B")
     {
         newRoom.bars=initBars("B");
-        newRoom.roomTemp = 15;
+        newRoom.roomTemp = 20;
     }
     if (roomType == "C")
     {
@@ -395,35 +417,26 @@ function initRoom(roomType)
         addJoin(newRoom, {bar: 0, pos: 4}, {bar: 2, pos: 0})
         addJoin(newRoom, {bar: 2, pos: 2}, {bar: 1, pos: 1})
         
-        /*newRoom.joins.push({sideA: {bar: 0, pos: 4}, sideB: {bar: 2, pos: 0}, temp: 15});
-        newRoom.joins.push({sideA: {bar: 2, pos: 2}, sideB: {bar: 1, pos: 1}, temp: 15}); */
-        console.log(newRoom);
-        console.log(newRoom.bars);
-        console.log(newRoom.bars[0]);
-        console.log(newRoom.bars[2]);
     }
     if (roomType == "Group_Easy")
     {
-        newRoom.bars=initBars("C");
+        newRoom.bars=initBars("G_Easy");
         newRoom.roomTemp = 25;
+        addJoin(newRoom, {bar:0, pos:19}, {bar:1, pos:0})
     }
     if (roomType == "Group_Medium")
     {
-        newRoom.bars=initBars("D");
+        newRoom.bars=initBars("G_Medium");
         newRoom.roomTemp = 25;
-        
-       
-        addJoin(newRoom, {bar: 0, pos: 2}, {bar: 1, pos: 2})
-        console.log(newRoom);
-        console.log(newRoom.bars);
-        console.log(newRoom.bars[0]);
-        console.log(newRoom.bars[1]);
-        //newRoom.joins.push({sideA: {bar: 0, pos: 2}, sideB: {bar: 1, pos: 2}, temp: 15});
+        addJoin(newRoom, {bar:0, pos:20}, {bar:2, pos:0});
+        addJoin(newRoom, {bar:2, pos:10}, {bar:1, pos:18})
     }
     if (roomType == "Group_Hard")
     {
-        newRoom.bars=initBars("B");
-        newRoom.roomTemp = 15;
+        newRoom.bars=initBars("G_Hard");
+        newRoom.roomTemp = 25;
+        addJoin(newRoom, {bar:0, pos:20}, {bar:2, pos:0});
+        addJoin(newRoom, {bar:2, pos:10}, {bar:1, pos:18})
     }
     return newRoom;
 }
@@ -483,7 +496,7 @@ function initBars(roomType){
     if (roomType == "D")
     {
         var newBar = initBar("A", 10, "Cu", 15, 5);
-        newBar.goals = [{pos:9, temp:10}];
+        newBar.goals = [{pos:9, temp:22}];
         newBar.fixed    = [0];
         newBar.variable = [{pos: 0, options: {floor: 20, ceil:120}}];
         bars.push(newBar);
@@ -498,6 +511,53 @@ function initBars(roomType){
 
     }
     
+    if (roomType == "G_Easy")
+    {
+        var newBar = initBar("A", 30, "Cu", 20, 5);
+        newBar.goals = [{pos:29, temp:33}];
+        newBar.fixed    = [0];
+        newBar.variable = [{pos: 0, options: {floor: 20, ceil:200}}];
+        bars.push(newBar);
+              
+        var newBar = initBar("B", 12, "Cu", 20, 5);
+        newBar.fixed  = [11];
+        newBar.variable = [{pos: 11, options: {floor: 50, ceil:250}}];
+        bars.push(newBar);
+
+    }
+    if (roomType == "G_Medium")
+    {
+        var newBar = initBar("A", 50, "Cu", 20, 6);
+        newBar.fixed = [0];
+        newBar.variable = [{pos: 0, options: {floor: 20, ceil:200}}];
+        bars.push(newBar);
+        
+        var newBar = initBar("B", 30, "Cu", 20, 6);
+        newBar.fixed = [29];
+        newBar.variable = [{pos: 29, options: {floor: 20, ceil:200}}];
+        bars.push(newBar);
+        
+        var newBar = initBar("C", 11, "Cu", 20, 6);
+        newBar.goals = [{pos:5, temp: 50}]
+        bars.push(newBar);
+
+    }
+    if (roomType == "G_Hard")
+    {
+        var newBar = initBar("A", 50, "Fe", 20, 6);
+        newBar.fixed = [0];
+        newBar.variable = [{pos: 0, options: {floor: 20, ceil:200}}];
+        bars.push(newBar);
+        
+        var newBar = initBar("B", 30, "Cu", 20, 6);
+        newBar.fixed = [29];
+        newBar.variable = [{pos: 29, options: {floor: 20, ceil:200}}];
+        bars.push(newBar);
+        
+        var newBar = initBar("C", 11, "Fe", 20, 6);
+        newBar.goals = [{pos:5, temp: 50}]
+        bars.push(newBar);
+    }
     return bars;
 }
 
@@ -551,44 +611,63 @@ function iterateBars(bars, roomTemp){
     
     for (bar in bars){
         var nextTemps = [];
-          
-        for (var i = 0; i < bars[bar].temps.length; i++){
-            nextTemps.push(bars[bar].temps[i]);
+        var thisBar = bars[bar];
+        for (var i = 0; i < thisBar.temps.length; i++){
+            nextTemps.push(thisBar.temps[i]);
             
             var secondDerivTX = 0;
             
             if (i == 0){
                 secondDerivTX = 
-                (- 2*bars[bar].temps[i] + bars[bar].temps[i + 1] +roomTemp)/(barDelta*barDelta/1000000);
+                (- 2*thisBar.temps[i] + thisBar.temps[i + 1] +roomTemp)/(barDelta*barDelta/1000000);
             } 
-            else if (i == bars[bar].temps.length -1)
+            else if (i == thisBar.temps.length -1)
             {
                 secondDerivTX = 
-                (bars[bar].temps[i -1] - 2*bars[bar].temps[i] +roomTemp)/(barDelta*barDelta/1000000);
+                (thisBar.temps[i -1] - 2*thisBar.temps[i] +roomTemp)/(barDelta*barDelta/1000000);
             }
             else 
             {
                 secondDerivTX = 
-                (bars[bar].temps[i -1] - 2* bars[bar].temps[i] + bars[bar].temps[i + 1])/(barDelta*barDelta/1000000);
+                (thisBar.temps[i -1] - 2* thisBar.temps[i] + thisBar.temps[i + 1])/(barDelta*barDelta/1000000);
             }
             
             var diffusivity =  0.000023;
             
-            if (bars[bar].material == "Cu"){
+            if (thisBar.material == "Cu"){
             diffusivity = 0.000111;
             }
-            if (bars[bar].material == "Fe"){
+            if (thisBar.material == "Fe"){
                 diffusivity = 0.000023;
             }
-            if (bars[bar].material == "Qu"){
+            if (thisBar.material == "Qu"){
                 diffusivity = 0.0000014;
             }
-            if (bars[bar].material == "Sn"){
+            if (thisBar.material == "Sn"){
                 diffusivity = 0.00004;
             }
         
             var deltaT = secondDerivTX * diffusivity *timeGap/1000;
-            nextTemps[i] = bars[bar].temps[i] + deltaT;
+            nextTemps[i] = thisBar.temps[i] + deltaT;
+        }
+        
+
+        // iterates over this bar's joins
+        for (join in thisBar.joins )
+        {   
+
+
+            var thisJoin =  thisBar.joins[join];
+
+            var secondDerivTX = 
+                ( -thisBar.temps[thisJoin.pos]
+                  + bars[thisJoin.next.bar].temps[thisJoin.next.pos])
+                    /(barDelta*barDelta/1000000);
+            var diffusivity = 0.000111;
+            
+            var deltaT = secondDerivTX * diffusivity *timeGap/1000;
+
+            nextTemps[thisJoin.pos] = nextTemps[thisJoin.pos] + deltaT;
         }
         
         if (bars[bar].fixed != null)
@@ -601,7 +680,14 @@ function iterateBars(bars, roomTemp){
                 }
             }
         }
-        
+        else
+        {
+            for (pos in thisBar.temps)
+            {
+                thisBar.temps[pos] =  nextTemps[pos];
+            }
+        }
+      
         if (bars[bar].globalLimit!= null)
         {
             for (temp in nextTemps)
@@ -626,44 +712,6 @@ function iterateBars(bars, roomTemp){
     return ({limit_exceeded:limit_exceeded, goal_reached:goal_reached});
 }
 
-// Used to update temperatures that cross between bars
-// Currently in testing phase
-function iterateJoins(bars, joins){
-    
-    for (var i = 0; i < joins.length; i++)
-    {
-        var sideA = joins[i].sideA;
-        var sideB = joins[i].sideB;
-
-        var secondDerivTX = 
-            (bars[sideA.bar].temps[sideA.pos]
-                - 2* joins[i].temp + 
-                bars[sideB.bar].temps[sideB.pos])
-                /(barDelta*barDelta/1000000);
-        var diffusivity = 0.000023;
-        
-        var deltaT = secondDerivTX * diffusivity *timeGap/1000;
-        var nextTempJ = joins[i].temp + deltaT;
-
-        secondDerivTX = 
-            (joins[i].temp - bars[sideA.bar].temps[sideA.pos]) 
-            /(barDelta*barDelta/1000000);
-        
-        deltaT = secondDerivTX * diffusivity *timeGap/1000;
-        var nextTempA = bars[sideA.bar].temps[sideA.pos] + deltaT;
-        
-        secondDerivTX = 
-            (joins[i].temp - bars[sideB.bar].temps[sideB.pos])
-            /(barDelta*barDelta/1000000);
-        deltaT = secondDerivTX * diffusivity *timeGap/1000;
-        var nextTempB = bars[sideB.bar].temps[sideB.pos] + deltaT;
-        
-        joins[i].temp = nextTempJ;
-        
-        bars[sideB.bar].temps[sideB.pos] = nextTempB;
-        bars[sideA.bar].temps[sideA.pos] = nextTempA;
-    }
-}
 
 http.listen((process.env.PORT || 3000), function(){
   console.log('listening on *:3000');

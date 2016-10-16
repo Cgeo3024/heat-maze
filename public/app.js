@@ -18,10 +18,14 @@ app.controller('mainController', function($scope, socket) {
     $scope.goal_reached = false;
     $scope.limit_exceeded = false;
     $scope.vol = 90;
+    $scope.mins = 10;
+    $scope.seconds = 00;
+    
     var canvas = null;
     var context;
-    var thickness =10;
+    var thickness =5;
     var drawn = [];
+    var cCoefficient = 1;
     // --- requests room change from the server ----//
     $scope.changeRoom = function(room){
         console.log("ChangeRoom Request::" +  room);
@@ -42,17 +46,22 @@ app.controller('mainController', function($scope, socket) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             var thickness = 10;
             console.log($scope.bars);
+            
+            var maxSize = 0;
+            for (bar in $scope.bars)
+            {
+                maxSize = Math.max(maxSize,$scope.bars[bar].points[$scope.bars[bar].points.length -1].pos );
+            }
+            
+            cCoefficient = ((0.8 * canvas.height )/(thickness * maxSize));
+            console.log("CCoefficient found of " + cCoefficient);
             for (bar in $scope.bars)
             {
                 console.log(bar);
-                drawBar(ctx, bar);
+                drawBar(ctx, bar, false, 0.1* canvas.height, 0.1*canvas.height);
                
             }
-            
-            /*ctx.fillRect (10, 10, 50, 50);
 
-            ctx.fillStyle = "rgba(0, 0, 200, 0.5)";
-            ctx.fillRect (30, 30, 50, 50); */
         }
     }
     
@@ -61,6 +70,7 @@ app.controller('mainController', function($scope, socket) {
         console.log(bar);
         console.log($scope.bars);
         bar = parseInt(bar);
+        ctx.font = "25px serif";
         // only draw bars not already drawn
         console.log("Drawn index " + drawn.indexOf(bar));
         if (drawn.indexOf(bar) < 0)
@@ -72,27 +82,33 @@ app.controller('mainController', function($scope, socket) {
             ctx.fillStyle = "grey";
             console.log("Starting at : X, Y: " + startX + " " + startY);
             console.log("horizontal: " + horizontal);
+            console.log($scope.bars);
+            
+            
             if (horizontal)
             {
                 ctx.fillRect(startX, startY, $scope.bars[bar].points[$scope.bars[bar].points.length -1].pos
-                * thickness,
-                thickness);
+                * thickness * cCoefficient,
+                thickness * cCoefficient);
+                
             }
             else
             {
                 ctx.fillRect(startX, startY, 
-                thickness,
+                cCoefficient * thickness,
                 $scope.bars[bar].points[$scope.bars[bar].points.length -1].pos
-                * thickness);
+                * thickness * cCoefficient);
             }
-            
-            console.log($scope.bars[bar].points[$scope.bars[bar].points.length -1].pos
-                * thickness);
+            ctx.fillStyle = "black";
+            ctx.fillText($scope.bars[bar].id, startX + thickness, startY + thickness);
+
             var orientation = !horizontal;  
             console.log("orientation is : " + orientation + "When horizontal is " + horizontal);
             ctx.fillStyle="blue";
             ctx.fillStyle="red";
             console.log($scope.bars[bar].variable)
+            
+            // draws all heat sources on the current bar
             for (variable in $scope.bars[bar].variable)
             {
                 var thisVar = $scope.bars[bar].variable[variable];
@@ -100,15 +116,15 @@ app.controller('mainController', function($scope, socket) {
                 console.log("Horizontal is " + horizontal);
                 if (horizontal)
                 {
-                    ctx.fillRect(startX + thisVar.pos * thickness,
+                    ctx.fillRect(startX + cCoefficient * thisVar.pos * thickness,
                         startY,
-                    thickness,
+                    cCoefficient * thickness,
                     thickness);
                 }
                 else
                 {
-                    ctx.fillRect(startX, startY + thisVar.pos * thickness, 
-                    thickness,
+                    ctx.fillRect(startX, startY + (cCoefficient * thisVar.pos * thickness), 
+                    cCoefficient * thickness,
                     thickness);
                 }
             }
@@ -123,14 +139,14 @@ app.controller('mainController', function($scope, socket) {
                 var newY;
                 if (horizontal)
                 {
-                    newX = startX + ($scope.bars[bar].joins[join].pos * thickness);
-                    newY = startY - ($scope.bars[bar].joins[join].next.pos);
+                    newX = startX + (cCoefficient * $scope.bars[bar].joins[join].pos * thickness);
+                    newY = startY - (cCoefficient * $scope.bars[bar].joins[join].next.pos);
                     
                 }
                 else
                 {
                     newX = startX;
-                    newY = startY + ($scope.bars[bar].joins[join].pos * thickness);
+                    newY = startY + (cCoefficient * $scope.bars[bar].joins[join].pos * thickness);
                 }
                 console.log(newY);
                 console.log(newX);
@@ -191,14 +207,21 @@ app.controller('mainController', function($scope, socket) {
     
     $scope.vote = function(){
         
+        console.log("voting");
+        console.log($scope.variableVals);
         var votes = [];
-        for (vv in $scope.variableVals)
+        var points = [];
+        for (bar in $scope.variableVals)
         {
-            if ($scope.variableVals[vv].variables.length > 0)
+            var thisBar = $scope.variableVals[bar];
+            for (v in thisBar.variables)
             {
-                votes.push($scope.variableVals[vv]);
+                points.push({pos: thisBar.variables[v].pos, temp: thisBar.variables[v].temp});
             }
+            votes.push({ bar: bar, values: points});
+            points = [];
         }
+        console.log(votes);
         socket.emit("vote", votes);
     }
     
@@ -211,8 +234,7 @@ app.controller('mainController', function($scope, socket) {
     }
     
     socket.on("alerts", function(data){
-        console.log("Alerts");
-        console.log(data);
+
         $scope.limit_exceeded = data.limit_exceeded;
         $scope.goal_reached = data.goal_reached;
     });
@@ -223,7 +245,7 @@ app.controller('mainController', function($scope, socket) {
         $scope.users = {name: "Me", score: 0};
         $scope.bars = data.bars;
         $scope.room = data.room;
-        $scope.time = 0;
+        $scope.time = 10* 60 * 1000;
         $scope.variableVals = [];
         
         // ---- Constructs a list of variable heat sources, to allow user updates. --- //
@@ -255,7 +277,8 @@ app.controller('mainController', function($scope, socket) {
            }
        }
        $scope.score = data.score;
-       $scope.time += data.elapsedTime;
+       //$scope.time -= data.elapsedTime;
+       $scope.timeLeft;
        
        if (canvas == null)
        {
@@ -263,18 +286,50 @@ app.controller('mainController', function($scope, socket) {
        }
     });
     
+    socket.on("Time Finished", function(){
+        $scope.template = "./partials/scoreCard.html";
+    });
+    
     // this is a more comprehensive method including victory condition handling //
     socket.on('update room', function(data){
-       var bars = data.details.bars;
-       for (i = 0; i < bars.length; i++){
+        var bars = data.details.bars;
+        for (i = 0; i < bars.length; i++){
            
-           for (j = 0; j < bars[i].points.length; j++){
-               
-               $scope.bars[i].points[j] = bars[i].points[j];
-           }
-       }
+            for (j = 0; j < bars[i].points.length; j++){
+
+                $scope.bars[i].points[j] = bars[i].points[j];
+            }
+
+            for (goal in $scope.bars[i].goals)
+            {
+                var thisGoal = $scope.bars[i].goals[goal];
+
+                thisGoal.actual = bars[i].goals[goal].actual;
+                
+                if (Math.floor(thisGoal.actual) == Math.floor(thisGoal.temp))
+                {
+                
+                    thisGoal.completed = true;
+                }
+                else
+                {
+                    thisGoal.completed = false;
+                }
+            }
+        }
+        
        $scope.score = data.details.score;
-       $scope.time += data.elapsedTime;
+       //$scope.time -= data.elapsedTime;
+       
+       $scope.time = data.timeLeft;
+       
+       $scope.mins = Math.floor($scope.time/(60 * 1000));
+       $scope.seconds = $scope.time%(60 * 1000);
+       
+       if (canvas == null)
+       {
+           initializeCanvas();
+       }
     });
     
     //------------used for group rooms ------//
