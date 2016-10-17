@@ -57,3 +57,23 @@
     <span ng-if="goal_reached == true"> Congratulations! You have achieved this room's goal! </span>
     <span ng-if="limit_exceeded == true"> Warning! You have exceeded this room's temperature limits </span>
 </div>
+
+<div id="messageBlock" class="outerdiv">
+    <div id="usersDiv">
+     <H3>Users ( <span id="userMult2"> 1 </span> )</H3>  
+        <ul id="users">
+            <li> <span id="yourName"> </span> (You) </li>
+        </ul>
+    </div>
+    <div id="messageList">
+        <h3> Chat Log </h3>
+        <ul id="messages">
+            <li ng-repeat="message in messages track by $index" class="message.type"> {{message.source}} said : {{message.content}} </li>
+        </ul>
+        <form ng-submit="sendMessage()">
+            <input type="text" id="m" autocomplete="off" ng-model="chat.myMessage"></input>
+            <button id="messageButton">Send</button>
+        </form>
+    </div>
+</div>
+

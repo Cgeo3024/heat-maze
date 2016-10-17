@@ -105,13 +105,15 @@ io.on('connection', function(socket){
         groupRoom.users.push(thisUser);
         var initVals = summarize(groupRoom.room);
         
+        socket.to(groupRoom.name).emit("system message", socket.id +" has joined the channel.");
+        socket.to(groupRoom.name).emit("add user", socket.id);
+            
         if (groupRoom.users.length <= 1)
         {   
             groupRoom.endTime = Date.now() + (timeLimitMins * 60 * 1000);
             console.log("Setting Handle");
             groupRoom.tickHandle = setInterval(function() {
                 var alerts = iterateRoom(groupRoom.room);
-                groupRoom.room.score += 1;
                 var summary = summarize(groupRoom.room);
                 io.to(groupRoom.name).emit("update room", {details: summary, elapsedTime : timeGap, timeLeft : groupRoom.endTime - Date.now()});
                 io.to(groupRoom.name).emit("alerts", alerts);
@@ -120,7 +122,7 @@ io.on('connection', function(socket){
                 {
                     clearInterval(groupRoom.tickHandle);
                     clearInterval(groupRoom.voteHandle);
-                    io.to(groupRoom.name).emit("Time Finished");
+                    io.to(groupRoom.name).emit("Time Finished", {time_exceeded: groupRoom.timeExceeded, time_at_goal: groupRoom.timeAtGoal});
                 }
             },
             timeGap);
@@ -170,6 +172,12 @@ io.on('connection', function(socket){
     
     socket.on('disconnect', function(){
         console.log(socket.id + " has left");
+        
+        // if the user was in a group room, tell their room they left
+        var groupRoomName = getUser(socket.id).room;
+        io.to(groupRoomName).emit('system message', socket.id + ' has disconnected');
+        io.to(groupRoomName).emit('remove user', socket.id);
+        
         disconnect_socket_rooms(socket.id);
         var thisUser = null;
         var index = -1;
@@ -184,6 +192,8 @@ io.on('connection', function(socket){
         {
             users.splice(index, 1);
         }
+        
+        
     });
     
     socket.on("vote", function(votes){
@@ -193,6 +203,16 @@ io.on('connection', function(socket){
         console.log("User vote recieved");
         console.log(thisUser.vote);
     });
+    
+    // ------------------------------ used for group chat connections -----------------//
+    
+    socket.on('chat message', function( msg){
+        var roomName = getUser(socket.id).room;
+        console.log(msg);
+        console.log
+        socket.broadcast.to(roomName).emit('chat message', {source:socket.id, type:"plain", content: msg});
+    });
+    // --- end of group chat settings ------------//
 });
 
 function disconnect_socket_rooms(socketID)
@@ -385,6 +405,24 @@ function summarize(room)
 
 function iterateRoom(room){
     var alerts = iterateBars(room.bars, room.roomTemp);
+    
+    var scoreMult = 1;
+    if(alerts.goal_reached)
+    {
+        room.goalReached += timeGap;
+        //scoreMult = 2;
+    }
+    
+    // users do not gain points when limits have been exceeded
+    if (alerts.limit_exceeded)
+    {
+        
+        room.timeExceeded += timeGap;
+        scoreMult = 0;
+    }
+    
+    room.score += (scoreMult * alerts.score);
+    
     return alerts;
 }
 
@@ -392,6 +430,10 @@ function initRoom(roomType)
 {
     // Room: {Users: [], name: string, bars: [], roomTemp: int, score: int}
     var newRoom = {score:0, roomTemp:20};
+    newRoom.goalReached = false;
+    newRoom.limitExceeded = false;
+    newRoom.timeAtGoal = 0;
+    newRoom.timeExceeded = 0;
     
     if (roomType == "A")
     {
@@ -608,6 +650,7 @@ function iterateBars(bars, roomTemp){
     
     var goal_reached = true;
     var limit_exceeded = false;
+    var goalScore = 0;
     
     for (bar in bars){
         var nextTemps = [];
@@ -701,15 +744,20 @@ function iterateBars(bars, roomTemp){
         
         for (goal in bars[bar].goals)
         {
-            if (bars[bar].temps[bars[bar].goals[goal].pos] != bars[bar].goals[goal].temp)
+            var diff = Math.abs(bars[bar].temps[bars[bar].goals[goal].pos] - bars[bar].goals[goal].temp);
+            
+            if ( diff > 1)
             {
                 goal_reached = false;
             }
+            
+            goalScore += Math.max(50 - (0.5 * diff * diff), 0);
         }
         nextTemps = [];
     } 
     
-    return ({limit_exceeded:limit_exceeded, goal_reached:goal_reached});
+    goalScore = goalScore / 1000
+    return ({score: goalScore, limit_exceeded:limit_exceeded, goal_reached:goal_reached});
 }
 
 
