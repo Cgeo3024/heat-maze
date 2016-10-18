@@ -4,7 +4,6 @@
 table, th, tr, td {
     border:black 1px solid;
     border-collapse:collapse;
-    width:80%;
 }
 
 div {
@@ -13,20 +12,37 @@ div {
     
 }
 
+.navButton{
+    height:30%;
+    width:30%;
+}
 .spreadElements
 {
     display: flex; 
-    justify-content: space-between;
+    justify-content: space-around;
 }
 .outerdiv {
     width:100%;
-
 }
 ul {
     list-style : none;
     border: 1px black solid;
 }
 
+.notVoted
+{
+    background-color:grey;
+}
+.haveVoted
+{
+    background-color: green;
+}
+
+.centeredText
+{
+    width:100%;
+    text-align:center;
+}
 </style>
 
 
@@ -40,30 +56,29 @@ ul {
 
 </head>
 <body ng-app="HeatMazeApp">
-    <div ng-controller="mainController">
-
-        <button ng-if="navDepth > 0" ng-click="back()"> Back </button>
-        <!--<div ng-include="template"></div>-->
-        <div ng-if="room != null">
-            <div class="outerdiv">
-
-              <div id="timer"> Time Left: (seconds) : {{time / 1000| number:0}}</div>
+    <div style="width:100%" ng-controller="mainController">
+        <div ng-include="header"></div>
+        
+        <div style="display:flex; justify-content:space-between">
+            <div style="width:100%">
+                <div ng-if="room != null">
+                    <div style="display:flex; justify-content:space-around;">
+                    <canvas id="barView" width=500 height=500 style="border:solid black 1px;">
+                    </canvas>
+                    
+                    </div>
+                    <hr>
+                </div>
+                        
+                <div ng-include="template"></div>
             </div>
             
-            <canvas id="barView" width=800 height=300>
-                
-            </canvas>
-            <div ng-include="template"></div>
+            <div style="float:right; height=100%;" ng-if="style == 'Group' && room != null" ng-include="chatWindow"></div>
         </div>
-        
-        <div ng-if="description == true" ng-include="descrURL">
-        </div>
-        
-        <div class="outerdiv" ng-if="navDepth < 2">
-            Choose a Set Up
+        <div class="outerdiv spreadElements" style="position:relative;" ng-if="navDepth < 2">
             <button class="navButton" ng-repeat="choice in navChoices" ng-click="navigateTo(choice)"> {{choice}} </button>
-        </div>
-
+        </div>        
+        
     </div>
 </body>
 </html>

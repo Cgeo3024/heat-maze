@@ -1,0 +1,23 @@
+<!-- just for chat elements, collapsibl -->
+<div id="messageBlock" style="height:100%; border:solid black 1px;">
+    
+    <div id="usersDiv">
+    <H3>Users ( {{users.length + 1}} )</H3>  
+        <ul id="users">
+            <li ng-class="{haveVoted: haveVoted == true, notVoted: haveVoted == false}"> {{yourName}} (You)</li>
+            <li ng-repeat="user in users" ng-class="{haveVoted: user.voted == true, notVoted: user.voted == false}"> {{user.name}} </li>
+        </ul>
+    </div>
+    
+    <div id="messageList" >
+        <h3> Chat Log </h3>
+        <ul id="messages">
+            <li ng-repeat="message in messages track by $index" class="message.type"> {{message.source}} said : {{message.content}} </li>
+        </ul>
+        <form ng-submit="sendMessage()">
+            <input type="text" id="m" autocomplete="off" ng-model="chat.myMessage"></input>
+            <button id="messageButton">Send</button>
+        </form>
+    </div>
+
+</div>

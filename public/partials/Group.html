@@ -1,79 +1,60 @@
-<table>
-    <caption>Users</caption>
-    <ul>
-        <li ng-repeat="user in users"> {{user.name}}</li>
-    </ul>
-</table>
-
-<span id="score">Current Room Score: {{score}}</span>
-<span id="TopScore">Top Room Score of All Time: {{BestScore}}</span>
-<div class="outerdiv spreadElements">
-    <div  ng-repeat="bar in bars">
-        <table>
-            <caption> Bar {{bar.id}}. Made of {{bar.material}}
-            </caption>
-            <tr>
-                <th>Position</th>
-                <th>Temperature</th>
-            </tr>
-            <tr ng-repeat="point in bar.points track by $index">
-                <td>{{point.pos}}</td>
-                <td>{{point.temp| number:0.1}}</td>
-            </tr>
-        </table>
-        <div ng-if="variableVals[$index].variables.length > 0">
-            Set Variable Heat Sources Temperatures
-            <div ng-repeat="variable in variableVals[$index].variables">
-            Position: {{variable.pos}}
-                <rzslider
-                     rz-slider-model="variable.temp"
-                     rz-slider-options="variable.options">
-                </rzslider>
-            </div>
-        </div>
-        
-        <div ng-if="bar.goals != null">
-            Your temperature goals for this bar are:
+<div class="spreadElements">
+    <div class="spreadElements" ng-repeat="bar in bars">
+        <div >
             <table>
+                <caption> Bar {{bar.id}}. Made of {{bar.material}}
+                </caption>
                 <tr>
                     <th>Position</th>
-                    <th> Goal Temperature  </th>
-                    <th> Current Temperature </th>
+                    <th>Temperature</th>
                 </tr>
-                <tr ng-repeat="goal in bar.goals">
-                    <td class="complete">{{goal.pos}}</td>
-                    <td>{{goal.temp}}</td>
-                    <td ng-class="{'complete' : goal.complete}">{{goal.actual| number:0.1}}</td>
+                <tr ng-repeat="point in bar.points track by $index">
+                    <td>{{point.pos}}</td>
+                    <td>{{point.temp| number:0.1}}</td>
                 </tr>
-                
             </table>
+            
+            <div ng-if="variableVals[$index].variables.length > 0">
+                Set Variable Heat Sources Temperatures
+                <div ng-repeat="variable in variableVals[$index].variables">
+                Position: {{variable.pos}}
+                    <rzslider
+                         rz-slider-model="variable.temp"
+                         rz-slider-options="variable.options">
+                    </rzslider>
+                </div>
+            </div>
+            
+            <div ng-if="bar.goals != null">
+                Your temperature goals for this bar are:
+                <table>
+                    <tr>
+                        <th>Position</th>
+                        <th> Goal Temperature  </th>
+                        <th> Current Temperature </th>
+                    </tr>
+                    <tr ng-repeat="goal in bar.goals">
+                        <td class="complete">{{goal.pos}}</td>
+                        <td>{{goal.temp}}</td>
+                        <td ng-class="{'complete' : goal.complete}">{{goal.actual| number:0.1}}</td>
+                    </tr>
+                    
+                </table>
+            </div>
         </div>
     </div>
 </div>
-<div class="outerdiv">
-    <button ng-click="vote()">Vote for these settings</button>
+<br>
+<div class="outerdiv spreadElements">
+    <div>
+        <button ng-click="vote()">Vote for these settings</button>
+        <span>Time until next vote: {{voteTime / 1000| number:0}}</span>
+    </div>
 </div>
 <div class="outerdiv">
     <span ng-if="goal_reached == true"> Congratulations! You have achieved this room's goal! </span>
     <span ng-if="limit_exceeded == true"> Warning! You have exceeded this room's temperature limits </span>
 </div>
 
-<div id="messageBlock" class="outerdiv">
-    <div id="usersDiv">
-     <H3>Users ( <span id="userMult2"> 1 </span> )</H3>  
-        <ul id="users">
-            <li> <span id="yourName"> </span> (You) </li>
-        </ul>
-    </div>
-    <div id="messageList">
-        <h3> Chat Log </h3>
-        <ul id="messages">
-            <li ng-repeat="message in messages track by $index" class="message.type"> {{message.source}} said : {{message.content}} </li>
-        </ul>
-        <form ng-submit="sendMessage()">
-            <input type="text" id="m" autocomplete="off" ng-model="chat.myMessage"></input>
-            <button id="messageButton">Send</button>
-        </form>
-    </div>
-</div>
+
 

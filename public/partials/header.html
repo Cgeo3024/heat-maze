@@ -1,0 +1,9 @@
+<div style="display: flex; justify-content: space-between;">
+    <button ng-if="navDepth > 0" ng-click="back()"> Back </button>
+    <!--<div ng-include="template"></div>-->
+    <div ng-if="navDepth > 1" > Time Left: (seconds) : {{time / 1000| number:0}}<br>
+    <span id="score">Current Room Score: {{score | number:0}}</span>
+    </div>
+    <a ng-if="navDepth > 0"> About </a>   
+</div>
+<hr>

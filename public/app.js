@@ -9,9 +9,11 @@ app.controller('mainController', function($scope, socket) {
     $scope.room = null;     
     $scope.time = 0;
     $scope.variableVals = [];
-    $scope.template = "./partials/main.html";
+    $scope.template = "./partials/descriptions/main.html";
+    $scope.header = "./partials/header.html";
     $scope.style = null;
     $scope.descrURL = "./partials/descriptions/main.html";
+    $scope.chatWindow = "./partials/chat.html";
     $scope.description = true;
     $scope.navDepth = 0;
     $scope.score = 0;
@@ -23,8 +25,14 @@ app.controller('mainController', function($scope, socket) {
     $scope.timeAtGoal = 0;
     $scope.timeExceeded = 0;
     
+    // ---- group room variables --- //
     $scope.messages = [];
     $scope.chat = {myMessage: ""};
+    
+    $scope.voteTime = 0;
+    
+    $scope.yourName = "";
+    $scope.haveVoted = false;
     
     var canvas = null;
     var context;
@@ -39,6 +47,7 @@ app.controller('mainController', function($scope, socket) {
         socket.emit("switch room", ("Solo_"+room));
     }
     
+    // sets up the display siumulation for the bars
     function initializeCanvas(){
         canvas = document.getElementById('barView');
         context = canvas.getContext('2d');
@@ -169,7 +178,7 @@ app.controller('mainController', function($scope, socket) {
         {
             socket.emit("Leave Rooms");
             $scope.style = null;
-            $scope.template = "./partials/main.html";
+            $scope.template = "./partials/descriptions/main.html";
             $scope.descrURL = "./partials/descriptions/main.html";
             $scope.description = true;
             $scope.navChoices = ["Group", "Solo"];
@@ -178,7 +187,7 @@ app.controller('mainController', function($scope, socket) {
         {
             socket.emit("Leave Room");
             socket.emit("Start Rooms", $scope.stlye);
-            $scope.template = "./partials/" + $scope.style + ".html";
+            $scope.template = "./partials/descriptions/"+ $scope.style + ".html";
             $scope.descrURL = "./partials/descriptions/"+ $scope.style + ".html";
             $scope.room = null;
             canvas = null;
@@ -196,11 +205,12 @@ app.controller('mainController', function($scope, socket) {
         {
             socket.emit("Start Rooms", choice);
             $scope.style = choice;
-            $scope.template = "./partials/" + choice + ".html";
+            $scope.template = "./partials/descriptions/"+ choice + ".html";
             $scope.descrURL = "./partials/descriptions/"+ choice + ".html";
         }
         else
-        {
+        {   
+            $scope.template = "./partials/"+$scope.style+".html";
             $scope.description = false;
             socket.emit($scope.style + " room", choice);
             console.log($scope.style + " room");
@@ -215,6 +225,7 @@ app.controller('mainController', function($scope, socket) {
         
         console.log("voting");
         console.log($scope.variableVals);
+        $scope.haveVoted = true;
         var votes = [];
         var points = [];
         for (bar in $scope.variableVals)
@@ -248,7 +259,7 @@ app.controller('mainController', function($scope, socket) {
     // ----- sets up a new room --- //
     socket.on('init', function (data) {
 
-        $scope.users = {name: "Me", score: 0};
+        //$scope.users.push({name: "Me", score: 0};
         $scope.bars = data.bars;
         $scope.room = data.room;
         $scope.time = 10* 60 * 1000;
@@ -292,6 +303,29 @@ app.controller('mainController', function($scope, socket) {
        }
     });
     
+    // registers that the group room's votes have been resolved
+    socket.on("vote done", function()
+    {
+        console.log("vote finished");
+        $scope.haveVoted = false;
+        for (user in $scope.users)
+        {
+            $scope.users[user].voted = false;
+        }
+    });
+    
+    socket.on('user voted', function(name)
+    {
+        for (user in $scope.users)
+        {
+            if ($scope.users[user].name == name)
+            {
+                $scope.users[user].voted = true;
+            }
+        }           
+    });
+
+    
     socket.on("Time Finished", function(data){
         $scope.template = "./partials/scoreCard.html";
         
@@ -328,23 +362,25 @@ app.controller('mainController', function($scope, socket) {
             }
         }
         
-       $scope.score = data.details.score;
-       //$scope.time -= data.elapsedTime;
-       
-       $scope.time = data.timeLeft;
-       
-       $scope.mins = Math.floor($scope.time/(60 * 1000));
-       $scope.seconds = $scope.time%(60 * 1000);
-       
-       if (canvas == null)
-       {
+        $scope.voteTime = data.voteTime;
+        
+        $scope.score = data.details.score;
+        //$scope.time -= data.elapsedTime;
+
+        $scope.time = data.timeLeft;
+
+        $scope.mins = Math.floor($scope.time/(60 * 1000));
+        $scope.seconds = $scope.time%(60 * 1000);
+
+        if (canvas == null)
+        {
            initializeCanvas();
-       }
+        }
     });
     
     //------------used for group rooms ------//
     socket.on('new user', function (data){
-        $socket.users.append(data);
+        $scope.users.append(data);
     });
     
     socket.on('update users', function (data){
@@ -356,9 +392,7 @@ app.controller('mainController', function($scope, socket) {
     });
     
     
-    // ----------------------- CHat messaging section --------------------//
-    
-    var userCount = 1;
+    // ----------------------- Chat messaging section --------------------//
         socket.on('connect', function(){
             socket.emit('user count query');
         });
@@ -393,15 +427,17 @@ app.controller('mainController', function($scope, socket) {
         });
         
         socket.on('add user', function(name){
-            $('#users').append($('<li id="user-'+name+'">').text(name));
-            userCount +=1;
-            $("#userMult2").text(userCount);
+            $scope.users.push({name: name, hasVoted:false});
         });
         
         socket.on('remove user', function(name){
-            $('#user-'+name).remove();
-            userCount -=1;
-            $("#userMult2").text(userCount);
+            for (user in $scope.users)
+            {
+                if ($scope.users[user].name == name)
+                {
+                    $scope.users.splice(user, 1);
+                }
+            }
         });
 
         

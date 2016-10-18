@@ -94,6 +94,9 @@ io.on('connection', function(socket){
             return;
         }
         
+        
+        
+        
         socket.join(choice);
         
         var thisUser = getUser(socket.id);
@@ -102,20 +105,35 @@ io.on('connection', function(socket){
         thisUser.solo = false;
                
         var groupRoom = getGroupRoom(choice);
+        
+        for (user in groupRoom.users)
+        {
+            socket.emit("add user", groupRoom.users[user].name);
+        }
         groupRoom.users.push(thisUser);
+        
         var initVals = summarize(groupRoom.room);
         
-        socket.to(groupRoom.name).emit("system message", socket.id +" has joined the channel.");
-        socket.to(groupRoom.name).emit("add user", socket.id);
-            
+        thisUser.name = ("guest" + groupRoom.users.length);
+        
+        socket.to(groupRoom.name).emit('chat message', {source:"system", type:"system", content: thisUser.name +" has joined the channel."});
+        socket.to(groupRoom.name).emit("add user", thisUser.name);
+        
+        
+        
         if (groupRoom.users.length <= 1)
         {   
+            // sets the room end time for 10 minutes in the future
             groupRoom.endTime = Date.now() + (timeLimitMins * 60 * 1000);
+            
+            groupRoom.voteTime = Date.now() + voteGap;
+            
             console.log("Setting Handle");
             groupRoom.tickHandle = setInterval(function() {
                 var alerts = iterateRoom(groupRoom.room);
                 var summary = summarize(groupRoom.room);
-                io.to(groupRoom.name).emit("update room", {details: summary, elapsedTime : timeGap, timeLeft : groupRoom.endTime - Date.now()});
+                io.to(groupRoom.name).emit("update room", {details: summary, elapsedTime : timeGap, timeLeft : groupRoom.endTime - Date.now(), voteTime: (groupRoom.voteTime - Date.now())});
+                
                 io.to(groupRoom.name).emit("alerts", alerts);
                 
                 if (Date.now() >= groupRoom.endTime)
@@ -130,6 +148,7 @@ io.on('connection', function(socket){
             groupRoom.voteHandle = setInterval(function() {
                 resolveVotes(groupRoom);
                 io.to(groupRoom.name).emit("vote done");
+                groupRoom.voteTime = Date.now() + voteGap;
             },
             voteGap);
         }
@@ -200,7 +219,11 @@ io.on('connection', function(socket){
         
         var thisUser = getUser(socket.id);
         thisUser.vote = votes;
-        console.log("User vote recieved");
+        
+        var groupRoomName = getUser(socket.id).room;
+        io.to(groupRoomName).emit('user voted', thisUser.name);
+        
+        console.log("User vote recieved " + thisUser.name);
         console.log(thisUser.vote);
     });
     
@@ -210,7 +233,7 @@ io.on('connection', function(socket){
         var roomName = getUser(socket.id).room;
         console.log(msg);
         console.log
-        socket.broadcast.to(roomName).emit('chat message', {source:socket.id, type:"plain", content: msg});
+        socket.broadcast.to(roomName).emit('chat message', {source:getUser(socket.id).name, type:"plain", content: msg});
     });
     // --- end of group chat settings ------------//
 });
