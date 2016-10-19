@@ -1,5 +1,8 @@
+<div id="chatHandle" style="background-color:black; float:left; width:15px; height:100%; cursor: pointer;" ng-click="toggleChat()">
+<span style="color:white; top:50%;"> {{chatCollapseIcon}}</div>
+
 <!-- just for chat elements, collapsibl -->
-<div id="messageBlock" style="height:100%; border:solid black 1px;">
+<div class="mainColour" ng-class="{'chatNav': showChat == false, 'chatNav--active' :showChat == true}" id="messageBlock" style="float:right; height:100%; border:solid black 1px;">
     
     <div id="usersDiv">
     <H3>Users ( {{users.length + 1}} )</H3>  
@@ -16,7 +19,7 @@
         </ul>
         <form ng-submit="sendMessage()">
             <input type="text" id="m" autocomplete="off" ng-model="chat.myMessage"></input>
-            <button id="messageButton">Send</button>
+            <button class="accentColour" id="messageButton">Send</button>
         </form>
     </div>
 

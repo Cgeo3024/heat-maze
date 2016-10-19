@@ -17,7 +17,7 @@ app.get('/', function(req, res){
     res.sendFile(__dirname + 'index.html');
 });
 
-var timeLimitMins = 10;
+var timeLimitMins = 0.5;
 var GroupRooms = [];
 var barDelta = 5;
 var timeGap = 5;
@@ -31,17 +31,26 @@ var soloRoomNames = ["A", "B", "C", "D"];
 // == generates group rooms for use == //
 function InitGroupRooms(){
     
+    
     for( var i = 0; i < groupRoomNames.length; i++)
-    {
-        var newRoom = {};
-        newRoom.name = groupRoomNames[i];
-        newRoom.users = [];
-        newRoom.room = initRoom("Group_" + groupRoomNames[i]);
-        newRoom.timeLeft = 
-        GroupRooms.push(newRoom);
+    {   
+        console.log("init " + i);
+        GroupRooms.push({});
+        initGroupRoom(i);
     }
+    
+    console.log("group inits done");
 }
 
+function initGroupRoom(index)
+{
+    var newRoom = {};
+    newRoom.name = groupRoomNames[index];
+    newRoom.users = [];
+    newRoom.room = initRoom("Group_" + groupRoomNames[index]);
+    newRoom.room.scoreSheet = {times:[], scoreIncreace:[]};
+    GroupRooms[index] = (newRoom);
+}
 
 InitGroupRooms();
 
@@ -140,7 +149,12 @@ io.on('connection', function(socket){
                 {
                     clearInterval(groupRoom.tickHandle);
                     clearInterval(groupRoom.voteHandle);
-                    io.to(groupRoom.name).emit("Time Finished", {time_exceeded: groupRoom.timeExceeded, time_at_goal: groupRoom.timeAtGoal});
+                    io.to(groupRoom.name).emit("Time Finished", {time_exceeded: groupRoom.room.timeExceeded, time_at_goal: groupRoom.room.timeAtGoal, score_profile: groupRoom.room.scoreSheet});
+                    console.log("group room values");
+                    console.log(groupRoom);
+                    console.log(groupRoom);
+                    
+                    initGroupRoom( groupRoomNames.indexOf(groupRoom.name));
                 }
             },
             timeGap);
@@ -445,7 +459,18 @@ function iterateRoom(room){
     }
     
     room.score += (scoreMult * alerts.score);
+    console.log(room);
+    room.scoreSheet.scoreIncreace.push(scoreMult * alerts.score);
     
+    if (room.scoreSheet.times.length > 0)
+    {
+        room.scoreSheet.times.push(timeGap + room.scoreSheet.times[room.scoreSheet.times.length -1]);
+    }
+    else
+    {
+        room.scoreSheet.times.push(timeGap);
+    }
+    room.scoreSheet.times.push()
     return alerts;
 }
 

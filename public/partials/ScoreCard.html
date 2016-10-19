@@ -2,9 +2,11 @@
     The Room's time has finished.
     
     
-    Your Final score is : {{score}}
-    
-    You spent {{ timeAtGoal/1000 |number:1}}} Seconds at the goal temperature.
-    
+    Your Final score is : {{score|number:1}}
+    <br>
+    You spent {{ timeAtGoal/1000 |number:1}} Seconds at the goal temperature.
+    <br>
     You spent {{ timeExceeded/1000 |number:1}} Seconds over the limit temperature
+    
+    <canvas id="myChart" width=100 height=400px></canvas>
 </div>

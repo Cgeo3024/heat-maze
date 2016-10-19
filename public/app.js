@@ -1,6 +1,6 @@
 var app = angular.module('HeatMazeApp',['rzModule']);
 
-app.controller('mainController', function($scope, socket) {
+app.controller('mainController', function($scope, $timeout, socket) {
     
     // ---- Solo User Room Constants --- //
     $scope.navChoices = ["Group", "Solo"];
@@ -24,10 +24,12 @@ app.controller('mainController', function($scope, socket) {
     $scope.seconds = 00;
     $scope.timeAtGoal = 0;
     $scope.timeExceeded = 0;
+    $scope.chatCollapseIcon = ">>";
     
     // ---- group room variables --- //
     $scope.messages = [];
     $scope.chat = {myMessage: ""};
+    $scope.showChat = false;
     
     $scope.voteTime = 0;
     
@@ -45,6 +47,19 @@ app.controller('mainController', function($scope, socket) {
         console.log("ChangeRoom Request::" +  room);
         $scope.room = null;
         socket.emit("switch room", ("Solo_"+room));
+    }
+    
+    $scope.toggleChat = function(){
+        console.log("showChat is " + $scope.showChat);
+        $scope.showChat = !$scope.showChat;
+        if ($scope.chatCollapseIcon == "<<")
+        {
+           $scope.chatCollapseIcon = ">>"; 
+        }
+        else
+        {
+            $scope.chatCollapseIcon = "<<";
+        }
     }
     
     // sets up the display siumulation for the bars
@@ -193,6 +208,7 @@ app.controller('mainController', function($scope, socket) {
             canvas = null;
             drawn = [];
             $scope.description = true;
+            $scope.showChat = false;
         }
         
         $scope.navDepth -=1;
@@ -214,6 +230,11 @@ app.controller('mainController', function($scope, socket) {
             $scope.description = false;
             socket.emit($scope.style + " room", choice);
             console.log($scope.style + " room");
+            
+            if ($scope.style == "Group")
+            {
+                $scope.showChat = true;
+            }
         }
         
         console.log("scope.style: " + $scope.style);
@@ -329,9 +350,14 @@ app.controller('mainController', function($scope, socket) {
     socket.on("Time Finished", function(data){
         $scope.template = "./partials/scoreCard.html";
         
+        
+        console.log("end data found");
         console.log(data);
         $scope.timeAtGoal = data.time_at_goal;
         $scope.timeExceed = data.time_exceeded;
+        
+        $timeout(showGraph(data.score_profile), 5000);
+        
     });
     
     // this is a more comprehensive method including victory condition handling //
@@ -443,12 +469,38 @@ app.controller('mainController', function($scope, socket) {
         
         $scope.sendMessage = function()
         {
+            if ($scope.chat.myMessage == "")
+            {
+                return;
+            }
             console.log("Sending chat message " + $scope.chat.myMessage);
             $scope.messages.push({source: "You", type: "plain", content: $scope.chat.myMessage});
             socket.emit("chat message", $scope.chat.myMessage);
+            
+            $scope.chat.myMessage = "";
         }
         // ---- end of group messaging section --- //
 });
+
+function showGraph(data){
+    ctx = document.getElementById("myChart");
+    //ctx = document.getElementById("barView");
+    console.log(data);
+    //data.times  
+    chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels : data.times,
+            datasets :[
+            {
+                label: "bar temperatures",
+                fill: false,
+                data:data.scoreIncreace,
+            }
+            ]
+        }
+    });
+}
 
 /*
 

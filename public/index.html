@@ -6,12 +6,38 @@ table, th, tr, td {
     border-collapse:collapse;
 }
 
-div {
-    margin-left:0; 
-    margin-right: 0;
-    
+.teal {
+background-color:#07889B;
+
 }
 
+.mainColour
+{
+    background-color:#d9dbdd;    
+}
+
+.accentColour
+{
+    background-color:#0db9f0;
+}
+.flushButton
+{
+    height: inherit;
+    border-style: none;
+    border-right: solid black 1px;
+}
+.tangerine
+{
+background-color:#E37222;
+}
+.powder
+{
+background-color:#66B9Bf;
+}
+.tan
+{
+background-color:#EEAA7B;
+}
 .navButton{
     height:30%;
     width:30%;
@@ -25,8 +51,9 @@ div {
     width:100%;
 }
 ul {
-    list-style : none;
+    list-style: none outside none;
     border: 1px black solid;
+    padding: 0px;
 }
 
 .notVoted
@@ -43,6 +70,29 @@ ul {
     width:100%;
     text-align:center;
 }
+
+.chatNav {
+    display:none;
+}
+
+.chatNav--active {
+  display:block;
+}
+
+.mainNoChat
+{
+    width:100%;
+}
+
+.mainChatExpanded
+{
+    width:75%;
+}
+
+.mainChatCollapsed
+{
+    width:98%;
+}
 </style>
 
 
@@ -51,16 +101,15 @@ ul {
     <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
     <link rel="stylesheet" type="text/css" href="./slider/rzslider.min.css"/>
 <script src="./slider/rzslider.min.js"></script>
-<script src="app.js"</script>
-<script src="Chart.js"></script>
-
+<script src="app.js"></script>
+<script src="./chart/Chart.js"></script>
 </head>
 <body ng-app="HeatMazeApp">
     <div style="width:100%" ng-controller="mainController">
         <div ng-include="header"></div>
         
-        <div style="display:flex; justify-content:space-between">
-            <div style="width:100%">
+        <div>
+            <div style="float:left;" ng-class="{'mainNoChat': style == 'Solo', 'mainChatExpanded' : showChat == true, 'mainChatCollapsed' : showChat == false}" >
                 <div ng-if="room != null">
                     <div style="display:flex; justify-content:space-around;">
                     <canvas id="barView" width=500 height=500 style="border:solid black 1px;">
