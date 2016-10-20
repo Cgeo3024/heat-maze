@@ -25,7 +25,6 @@ var barDelta = 5;
 var timeGap = 5;
 var voteGap = 10000; // time in between group room vote polls
 var users = [];
-var SoloRooms = [];
 var groupRoomNames = ["Easy", "Medium", "Hard"];
 var soloRoomNames = ["A", "B", "C", "D"];
 
@@ -60,7 +59,9 @@ io.on('connection', function(socket){
     
     // fires when users leave a room with the back button
     socket.on("Leave Room", function()
-    {
+    {   
+        var thisUser = getUser(socket.id);
+        socket.to(thisUser.room.name).emit("remove user", thisUser.name);
         disconnect_socket_rooms(socket.id);
     });
     
@@ -75,16 +76,17 @@ io.on('connection', function(socket){
             socket.emit("updateNav", groupRoomNames);
         }
     });
-    
+        
     // fires when users choose to join a solo room
     socket.on("Join Room", function(choice)
     {
-        console.log("user " + socket.id +" switched to " + choice);
+        
         console.log(socket.id + " requests to join room " + choice);
         
         var room = null;
         var solo = false;
         var thisUser = getUser(socket.id);
+        var channelName;
         
         if (groupRoomNames.indexOf(choice) > -1) {
             
@@ -100,17 +102,15 @@ io.on('connection', function(socket){
             
             socket.to(room.name).emit('chat message', {source:"system", type:"system", content: thisUser.name +" has joined the channel."});
             socket.to(room.name).emit("add user", thisUser.name);
+            
+            channelName = room.name;
         }
         else
         if (soloRoomNames.indexOf(choice) > -1)
         {
-            if (getSoloRoom(choice) != null)
-            {
-                socket.emit("Room Busy");
-                return;
-            }
             room = initRoom(choice);
             solo = true;
+            channelName = socket.id;
         }
         else
         {
@@ -126,8 +126,8 @@ io.on('connection', function(socket){
         socket.emit("init", initVals);
         
         thisUser.room = room;
-        
-        socket.join(choice);
+       
+        socket.join(channelName);
         
         if (room.users.length == 1)
         {   
@@ -141,7 +141,7 @@ io.on('connection', function(socket){
                 
                 room.voteHandle = setInterval(function() {
                     resolveVotes(room);
-                    io.to(room.name).emit("vote done");
+                    io.to(channelName).emit("vote done");
                     room.voteTime = Date.now() + voteGap;
                 },
                 room.voteTime - Date.now());
@@ -151,9 +151,9 @@ io.on('connection', function(socket){
             room.tickHandle = setInterval(function() {
                 var alerts = iterateRoom(room);
                 var summary = summarize(room);
-                io.to(room.name).emit("update room", {details: summary, elapsedTime : timeGap, timeLeft : room.endTime - Date.now(), voteTime: (room.voteTime - Date.now())});
+                io.to(channelName).emit("update room", {details: summary, elapsedTime : timeGap, timeLeft : room.endTime - Date.now(), voteTime: (room.voteTime - Date.now())});
                 
-                io.to(room.name).emit("alerts", alerts);
+                io.to(channelName).emit("alerts", alerts);
                 
                 // after the room has ended we clear the handles
                 // and remove users from the channel and room after notifying final changes
@@ -161,16 +161,20 @@ io.on('connection', function(socket){
                 {
                     clearInterval(room.tickHandle);
                     clearInterval(room.voteHandle);
-                    io.to(groupRoom.name).emit("Time Finished", {time_exceeded: room.room.timeExceeded, time_at_goal: room.room.timeAtGoal, score_profile: room.room.scoreSheet});
+                    io.to(channelName).emit("Time Finished", {time_exceeded: room.timeExceeded, time_at_goal: room.timeAtGoal, score_profile: room.scoreSheet});
                     
-                    // unsubscribes all clients from this room
-                    io.sockets.clients(socket.room).forEach(function(listener) {
-                        listener.leave(socket.room);
-                    });
-                    room = null;
                     if (!solo)
                     {
-                        initGroupRoom( groupRoomNames.indexOf(room.name));    
+                        var roomName = socket.room;
+                        
+                        io.to(channelName).emit("leave channel", channelName);
+                        // unsubscribes all clients from this room
+                        /*io.sockets.clients(socket.room).forEach(function(listener) {
+                        listener.leave(socket.room);
+                        }); */
+                        
+                        initGroupRoom(groupRoomNames.indexOf(room.name));    
+
                     }
                     
                 }
@@ -179,7 +183,10 @@ io.on('connection', function(socket){
         }
     });
 
-
+    socket.on("leave", function(channel){
+        socket.leave(channel);
+    });
+    
     // user requests change to variable heat sources
     socket.on("update sources", function(data){
         
@@ -280,6 +287,7 @@ function disconnect_socket_rooms(socketID)
     {
         clearInterval(thisRoom.tickHandle);
         clearInterval(thisRoom.voteHandle);
+        initGroupRoom(thisRoom.name);
     }
     thisUser.room = null;
         
@@ -369,16 +377,6 @@ function getGroupRoom(roomName)
     }
 }
 
-function getSoloRoom(roomName)
-{
-    for (i in SoloRooms){
-        if (SoloRooms[i].name == roomName){
-            return SoloRooms[i];
-        }
-    }
-    
-    return null;
-}
 
 // creates a condensed sumamry of the user room for transmission
 function summarize(room)
@@ -659,7 +657,7 @@ function initBar(id, length, material, roomTemp, divisions){
     newBar.id = id;
     newBar.material = material;
     newBar.temps = [];
-    
+    newBar.globalLimit = 500;
     for (i = 0; i < length; i++){
         newBar.temps.push(roomTemp);
     }

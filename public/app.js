@@ -25,6 +25,8 @@ app.controller('mainController', function($scope, $timeout, socket) {
     $scope.timeAtGoal = 0;
     $scope.timeExceeded = 0;
     $scope.chatCollapseIcon = ">>";
+    $scope.bestScore = 2500;
+    $scope.judgement= "";
     
     // ---- group room variables --- //
     $scope.messages = [];
@@ -202,6 +204,7 @@ app.controller('mainController', function($scope, $timeout, socket) {
             $scope.room = null;
             canvas = null;
             drawn = [];
+            $scope.users = [];
             $scope.description = true;
             $scope.showChat = false;
         }
@@ -350,7 +353,18 @@ app.controller('mainController', function($scope, $timeout, socket) {
         $scope.timeAtGoal = data.time_at_goal;
         $scope.timeExceed = data.time_exceeded;
         
-        $timeout(showGraph(data.score_profile), 5000);
+        if ($scope.timeAtGoal < $scope.timeExceed)
+        {
+            $scope.judgement.append("You spent more time above the limit temperature than at the goal temperature. "
+            +"Since you get no points when above the limit temperature, try to minimize the time spent above that value. Consider how the rate of" +
+            " temperature change differs between heating a metal bar and relying on a lower room temperature to cool it down." )
+        }
+        
+        if ($scope.timeExceed == 0) {
+            $scope.judgement = "You managed to never exceed the limit temperature. Well done! However, consider whether exceeding the limit for a short time may allow you to reach the target temperature faster. Do the extra points for reaching the target faster make up for the ones lost when exceeding the limit?"
+        }
+        
+        showGraph(data.score_profile);
         
     });
     
@@ -400,15 +414,7 @@ app.controller('mainController', function($scope, $timeout, socket) {
         }
     });
     
-    //------------used for group rooms ------//
-    socket.on('new user', function (data){
-        $scope.users.append(data);
-    });
-    
-    socket.on('update users', function (data){
-        
-    });
-    
+       
     socket.on('updateNav', function(navVals){
         $scope.navChoices = navVals;
     });
@@ -462,6 +468,10 @@ app.controller('mainController', function($scope, $timeout, socket) {
         }
     });
 
+    socket.on("leave channel", function(channelName)
+    {
+        socket.emit("leave", channelName);
+    });
     
     $scope.sendMessage = function()
     {
@@ -479,23 +489,36 @@ app.controller('mainController', function($scope, $timeout, socket) {
 });
 
 function showGraph(data){
-    ctx = document.getElementById("myChart");
+    var context = document.getElementById("myChart");
     //ctx = document.getElementById("barView");
-    console.log(data);
-    //data.times  
-    chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels : data.times,
-            datasets :[
-            {
-                label: "bar temperatures",
-                fill: false,
-                data:data.scoreIncreace,
-            }
-            ]
+    
+    var renderHandle = setInterval(function()
+    {
+        context = document.getElementById("myChart");
+        if (context != null)
+        {
+            chart = new Chart(context, {
+                type: 'line',
+                data: {
+                    labels : data.times,
+                    datasets :[
+                    {
+                        label: "Score Gained per Tick",
+                        fill: false,
+                        data:data.scoreIncreace,
+                    }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            
+            clearInterval(renderHandle);
         }
-    });
+    }, 100);
+    //data.times  
 }
 
 /*

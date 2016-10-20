@@ -4,9 +4,23 @@
     
     Your Final score is : {{score|number:1}}
     <br>
+    The current high score for this room is : {{bestScore|number:1}}
+    <br>
+    <span ng-if="score >= bestScore"> You have beaten the high score, well done! </span>
+    <br>
+    
     You spent {{ timeAtGoal/1000 |number:1}} Seconds at the goal temperature.
     <br>
-    You spent {{ timeExceeded/1000 |number:1}} Seconds over the limit temperature
+    You spent {{ timeExceeded/1000 |number:1}} Seconds over the limit temperatures.
+    <br>
+    <br>
+    {{judgement}}
+    <br>
+    <br>
     
-    <canvas id="myChart" width=100 height=400px></canvas>
+    Below is your score gain profile. This shows where you achieved a high score gain per second and where a low score gain per second. Consider how the bar temperatures chaning throughout the experiment 
+    affected the score.
+    <div style="height:400px">
+        <canvas id="myChart" width=100 height=400px></canvas>
+    </div>
 </div>
