@@ -11,187 +11,181 @@ app.use(bodyParser.urlencoded({
     extended: true
 }));
 
+// serves the public folder to provide static resources
 app.use(express.static(__dirname + '/public'));
 
+// only the main route is redirected, there are no other ways to access the app
 app.get('/', function(req, res){
     res.sendFile(__dirname + 'index.html');
 });
 
-var timeLimitMins = 0.5;
+var timeLimitMins = 5; // Any room will time out after 5 minutes, to prevent someone camping a room
 var GroupRooms = [];
 var barDelta = 5;
 var timeGap = 5;
-var voteGap = 3000; // time in between group room vote polls
-var roomTemp = 15;
-var userCount = 0;
+var voteGap = 10000; // time in between group room vote polls
 var users = [];
+var SoloRooms = [];
 var groupRoomNames = ["Easy", "Medium", "Hard"];
 var soloRoomNames = ["A", "B", "C", "D"];
 
 // == generates group rooms for use == //
 function InitGroupRooms(){
     
-    
     for( var i = 0; i < groupRoomNames.length; i++)
     {   
-        console.log("init " + i);
         GroupRooms.push({});
         initGroupRoom(i);
     }
     
-    console.log("group inits done");
 }
 
+// inits a specific group room, used to refresh rooms after they end.
 function initGroupRoom(index)
 {
-    var newRoom = {};
-    newRoom.name = groupRoomNames[index];
-    newRoom.users = [];
-    newRoom.room = initRoom("Group_" + groupRoomNames[index]);
-    newRoom.room.scoreSheet = {times:[], scoreIncreace:[]};
+    var newRoom = initRoom(groupRoomNames[index]);
+    
     GroupRooms[index] = (newRoom);
 }
 
+// intialises all the group rooms on server start
 InitGroupRooms();
 
-// Functions first set up when suer connects to the socket.io instance
+// Functions first set up when user connects to the socket.io instance
 io.on('connection', function(socket){
     
     console.log("new member joined!");
     
-    users.push({id: socket.id, bars:null, handle: null});
+    users.push({id: socket.id, room:null});
     
+    // fires when users leave a room with the back button
     socket.on("Leave Room", function()
     {
         disconnect_socket_rooms(socket.id);
     });
     
-    socket.on("Solo room", function(choice)
-    {
-        console.log("user " + socket.id +" switched to " + choice);
-        
-        var thisUser = getUser(socket.id);
-        clearInterval(thisUser.handle);
-        
-        var newRoom = initRoom(choice);
-        
-        var initVals = summarize(newRoom);
-        
-        socket.emit("init", initVals);
-        
-        thisUser.room = newRoom;
-        clearInterval(thisUser.handle);
-
-        thisUser.solo = true;
-        thisUser.handle = setInterval(function() {
-           var alerts = iterateRoom(thisUser.room);
-           var summary = summarize(thisUser.room);
-           socket.emit("update bars", {bars: summary.bars, elapsedTime : timeGap});
-           socket.emit("alerts", alerts);
-           },
-           timeGap);
-           
+    // updates users on the wait times for rooms.
+    socket.on("Join Lobby", function(lobby){
+        if (lobby == "Solo")
+        {
+            socket.emit("updateNav", soloRoomNames);
+        }
+        if (lobby == "Group")
+        {
+            socket.emit("updateNav", groupRoomNames);
+        }
     });
     
-    socket.on("Group room", function(choice)
+    // fires when users choose to join a solo room
+    socket.on("Join Room", function(choice)
     {
-        console.log(socket.id + " requests to join group room " + choice);
+        console.log("user " + socket.id +" switched to " + choice);
+        console.log(socket.id + " requests to join room " + choice);
         
-        if (groupRoomNames.indexOf(choice) == -1) {
+        var room = null;
+        var solo = false;
+        var thisUser = getUser(socket.id);
+        
+        if (groupRoomNames.indexOf(choice) > -1) {
+            
+            room = getGroupRoom(choice);
+            solo = false;
+            
+            for (user in room.users)
+            {
+                socket.emit("add user", room.users[user].name);
+            }
+
+            thisUser.name = ("guest" + (room.users.length + 1));
+            
+            socket.to(room.name).emit('chat message', {source:"system", type:"system", content: thisUser.name +" has joined the channel."});
+            socket.to(room.name).emit("add user", thisUser.name);
+        }
+        else
+        if (soloRoomNames.indexOf(choice) > -1)
+        {
+            if (getSoloRoom(choice) != null)
+            {
+                socket.emit("Room Busy");
+                return;
+            }
+            room = initRoom(choice);
+            solo = true;
+        }
+        else
+        {
             socket.emit("No Such Room");
             console.log("No such room found");
             return;
         }
         
+        room.users.push(thisUser);
         
+        var initVals = summarize(room);
         
+        socket.emit("init", initVals);
+        
+        thisUser.room = room;
         
         socket.join(choice);
         
-        var thisUser = getUser(socket.id);
-        
-        thisUser.room = choice;
-        thisUser.solo = false;
-               
-        var groupRoom = getGroupRoom(choice);
-        
-        for (user in groupRoom.users)
-        {
-            socket.emit("add user", groupRoom.users[user].name);
-        }
-        groupRoom.users.push(thisUser);
-        
-        var initVals = summarize(groupRoom.room);
-        
-        thisUser.name = ("guest" + groupRoom.users.length);
-        
-        socket.to(groupRoom.name).emit('chat message', {source:"system", type:"system", content: thisUser.name +" has joined the channel."});
-        socket.to(groupRoom.name).emit("add user", thisUser.name);
-        
-        
-        
-        if (groupRoom.users.length <= 1)
+        if (room.users.length == 1)
         {   
-            // sets the room end time for 10 minutes in the future
-            groupRoom.endTime = Date.now() + (timeLimitMins * 60 * 1000);
-            
-            groupRoom.voteTime = Date.now() + voteGap;
-            
+            // sets the room end time for timeLimit mins in the future
+            room.endTime = Date.now() + (timeLimitMins * 60 * 1000);
+            room.voteHandle = null;
+            room.voteTime = voteGap;
+            if (! solo)
+            {
+                room.voteTime = Date.now() + voteGap;
+                
+                room.voteHandle = setInterval(function() {
+                    resolveVotes(room);
+                    io.to(room.name).emit("vote done");
+                    room.voteTime = Date.now() + voteGap;
+                },
+                room.voteTime - Date.now());
+            }
+                                     
             console.log("Setting Handle");
-            groupRoom.tickHandle = setInterval(function() {
-                var alerts = iterateRoom(groupRoom.room);
-                var summary = summarize(groupRoom.room);
-                io.to(groupRoom.name).emit("update room", {details: summary, elapsedTime : timeGap, timeLeft : groupRoom.endTime - Date.now(), voteTime: (groupRoom.voteTime - Date.now())});
+            room.tickHandle = setInterval(function() {
+                var alerts = iterateRoom(room);
+                var summary = summarize(room);
+                io.to(room.name).emit("update room", {details: summary, elapsedTime : timeGap, timeLeft : room.endTime - Date.now(), voteTime: (room.voteTime - Date.now())});
                 
-                io.to(groupRoom.name).emit("alerts", alerts);
+                io.to(room.name).emit("alerts", alerts);
                 
-                if (Date.now() >= groupRoom.endTime)
+                // after the room has ended we clear the handles
+                // and remove users from the channel and room after notifying final changes
+                if (Date.now() >= room.endTime)
                 {
-                    clearInterval(groupRoom.tickHandle);
-                    clearInterval(groupRoom.voteHandle);
-                    io.to(groupRoom.name).emit("Time Finished", {time_exceeded: groupRoom.room.timeExceeded, time_at_goal: groupRoom.room.timeAtGoal, score_profile: groupRoom.room.scoreSheet});
-                    console.log("group room values");
-                    console.log(groupRoom);
-                    console.log(groupRoom);
+                    clearInterval(room.tickHandle);
+                    clearInterval(room.voteHandle);
+                    io.to(groupRoom.name).emit("Time Finished", {time_exceeded: room.room.timeExceeded, time_at_goal: room.room.timeAtGoal, score_profile: room.room.scoreSheet});
                     
-                    initGroupRoom( groupRoomNames.indexOf(groupRoom.name));
+                    // unsubscribes all clients from this room
+                    io.sockets.clients(socket.room).forEach(function(listener) {
+                        listener.leave(socket.room);
+                    });
+                    room = null;
+                    if (!solo)
+                    {
+                        initGroupRoom( groupRoomNames.indexOf(room.name));    
+                    }
+                    
                 }
             },
             timeGap);
-            
-            groupRoom.voteHandle = setInterval(function() {
-                resolveVotes(groupRoom);
-                io.to(groupRoom.name).emit("vote done");
-                groupRoom.voteTime = Date.now() + voteGap;
-            },
-            voteGap);
-        }
-        
-        socket.emit("init", initVals);     
-
-        
-    });
-    
-    socket.on("Start Rooms", function(choice)
-    {
-        if (choice == "Solo")
-        {
-            socket.emit("updateNav", soloRoomNames);
-        }
-        if (choice == "Group")
-        {
-            socket.emit("updateNav", groupRoomNames);
         }
     });
 
-    
-    
+
     // user requests change to variable heat sources
     socket.on("update sources", function(data){
         
         var thisUser = getUser(socket.id)
         
-        if (thisUser.solo == false)
+        if (thisUser.room.solo == false)
         {
             vote(thisUser, data);
             return;
@@ -203,28 +197,39 @@ io.on('connection', function(socket){
         }
     });
     
+    // fires when users leave the website completely
     socket.on('disconnect', function(){
         console.log(socket.id + " has left");
         
-        // if the user was in a group room, tell their room they left
-        var groupRoomName = getUser(socket.id).room;
-        io.to(groupRoomName).emit('system message', socket.id + ' has disconnected');
-        io.to(groupRoomName).emit('remove user', socket.id);
-        
-        disconnect_socket_rooms(socket.id);
-        var thisUser = null;
+        // if the user is not currently in a room, we simply remove then from the users index
         var index = -1;
         for (user in users){
             if (users[user].id == socket.id){
-                thisUser = users[user];
-                clearInterval(user.handle);
                 index = user;
+                thisUser = users[user];
             }
         }
-        if (index > -1)
+        if (index < 0)
         {
-            users.splice(index, 1);
+            return;
         }
+
+        // if the user was in a group room, tell their room they left
+        var room = thisUser.room;
+        
+        if (room == null)
+        {
+            return;
+        }
+        if (room.solo == false)
+        {
+            io.to(room.name).emit('system message', socket.id + ' has disconnected');
+            io.to(groupRoomName).emit('remove user', socket.id);
+        }
+        
+        disconnect_socket_rooms(socket.id);
+        
+        
         
         
     });
@@ -234,20 +239,18 @@ io.on('connection', function(socket){
         var thisUser = getUser(socket.id);
         thisUser.vote = votes;
         
-        var groupRoomName = getUser(socket.id).room;
-        io.to(groupRoomName).emit('user voted', thisUser.name);
+        var room = getUser(socket.id).room;
+        io.to(room.name).emit('user voted', thisUser.name);
         
         console.log("User vote recieved " + thisUser.name);
-        console.log(thisUser.vote);
     });
     
     // ------------------------------ used for group chat connections -----------------//
     
-    socket.on('chat message', function( msg){
-        var roomName = getUser(socket.id).room;
-        console.log(msg);
-        console.log
-        socket.broadcast.to(roomName).emit('chat message', {source:getUser(socket.id).name, type:"plain", content: msg});
+    socket.on('chat message', function(msg){
+        var room = getUser(socket.id).room;
+
+        socket.broadcast.to(room.name).emit('chat message', {source:getUser(socket.id).name, type:"plain", content: msg});
     });
     // --- end of group chat settings ------------//
 });
@@ -255,41 +258,30 @@ io.on('connection', function(socket){
 function disconnect_socket_rooms(socketID)
 {
     var thisUser = getUser(socketID);
-    var usersRoom = getGroupRoom(thisUser.room);
+    var thisRoom = thisUser.room;
     
-    // skip these steps if it is a group room
-    if(groupRoomNames.indexOf(thisUser.room) == -1)
+    var index = -1;
+        
+    for (user in thisRoom.users)
     {
-        clearInterval(thisUser.handle);
-        thisUser.room = null;
+        if(thisRoom.users[user].id == socketID)
+        {
+            index = user;
+        }
     }
-    else
+    
+    if(index > -1)
     {
-
-        var index = -1;
+        thisRoom.users.splice(index, 1);
         
-        for (user in usersRoom.users)
-        {
-            if(usersRoom.users[user].id == socketID)
-            {
-                index = user;
-            }
-        }
-        
-        if(index > -1)
-        {
-            usersRoom.users.splice(index, 1);
-            
-        }
-        
-        if (usersRoom.users.length < 1)
-        {
-            clearInterval(usersRoom.tickHandle);
-            clearInterval(usersRoom.voteHandle);
-        }
-        thisUser.room = null;
-
     }
+    
+    if (thisRoom.users.length < 1)
+    {
+        clearInterval(thisRoom.tickHandle);
+        clearInterval(thisRoom.voteHandle);
+    }
+    thisUser.room = null;
         
 }
 function getMedian(data) {
@@ -306,13 +298,13 @@ function resolveVotes(room){
    
    
     var talley = [];
-    for ( bar  in room.room.bars)
+    for ( bar  in room.bars)
     {   
         talley.push([]);
-        for(v in room.room.bars[bar].variable)
+        for(v in room.bars[bar].variable)
         {
             
-            talley[bar].push({pos:room.room.bars[bar].variable[v].pos, values:[]});
+            talley[bar].push({pos:room.bars[bar].variable[v].pos, values:[]});
         }
     }
     
@@ -321,8 +313,6 @@ function resolveVotes(room){
     {   
 
         var thisVote = room.users[i].vote;
-        console.log("We have a vote:");
-        console.log(thisVote);
         if(room.users[i].vote != null)
         {
             voteCount += 1;
@@ -332,8 +322,7 @@ function resolveVotes(room){
         {
             for (point in thisVote[bar].values)
             {
-                console.log(thisVote[bar].values[point]);
-                console.log(talley[thisVote[bar].bar][point]);
+
                 if (thisVote[bar].values[point].pos == talley[thisVote[bar].bar][point].pos)
                 {
                     talley[thisVote[bar].bar][point].values.push(thisVote[bar].values[point].temp);
@@ -341,7 +330,6 @@ function resolveVotes(room){
             }
         }
     }  
-    console.log(talley);
     
     if (voteCount < 1)
     {
@@ -353,7 +341,7 @@ function resolveVotes(room){
         for (point in talley[bar])
         {
             var talleyVal = talley[bar][point];
-            room.room.bars[bar].temps[talleyVal.pos] = getMedian(talleyVal.values);
+            room.bars[bar].temps[talleyVal.pos] = getMedian(talleyVal.values);
         }
     }
     
@@ -379,6 +367,17 @@ function getGroupRoom(roomName)
             return GroupRooms[i];
         }
     }
+}
+
+function getSoloRoom(roomName)
+{
+    for (i in SoloRooms){
+        if (SoloRooms[i].name == roomName){
+            return SoloRooms[i];
+        }
+    }
+    
+    return null;
 }
 
 // creates a condensed sumamry of the user room for transmission
@@ -459,7 +458,7 @@ function iterateRoom(room){
     }
     
     room.score += (scoreMult * alerts.score);
-    console.log(room);
+
     room.scoreSheet.scoreIncreace.push(scoreMult * alerts.score);
     
     if (room.scoreSheet.times.length > 0)
@@ -476,13 +475,15 @@ function iterateRoom(room){
 
 function initRoom(roomType)
 {
-    // Room: {Users: [], name: string, bars: [], roomTemp: int, score: int}
     var newRoom = {score:0, roomTemp:20};
+
     newRoom.goalReached = false;
     newRoom.limitExceeded = false;
     newRoom.timeAtGoal = 0;
     newRoom.timeExceeded = 0;
-    
+    newRoom.users = [];
+    newRoom.scoreSheet = {times:[], scoreIncreace:[]};
+    newRoom.name = roomType;
     if (roomType == "A")
     {
         newRoom.bars=initBars("A");
@@ -508,20 +509,20 @@ function initRoom(roomType)
         addJoin(newRoom, {bar: 2, pos: 2}, {bar: 1, pos: 1})
         
     }
-    if (roomType == "Group_Easy")
+    if (roomType == "Easy")
     {
         newRoom.bars=initBars("G_Easy");
         newRoom.roomTemp = 25;
         addJoin(newRoom, {bar:0, pos:19}, {bar:1, pos:0})
     }
-    if (roomType == "Group_Medium")
+    if (roomType == "Medium")
     {
         newRoom.bars=initBars("G_Medium");
         newRoom.roomTemp = 25;
         addJoin(newRoom, {bar:0, pos:20}, {bar:2, pos:0});
         addJoin(newRoom, {bar:2, pos:10}, {bar:1, pos:18})
     }
-    if (roomType == "Group_Hard")
+    if (roomType == "Hard")
     {
         newRoom.bars=initBars("G_Hard");
         newRoom.roomTemp = 25;
@@ -814,3 +815,110 @@ http.listen((process.env.PORT || 3000), function(){
 });
 
 
+    /*
+    // fires when users choose to join a solo room
+    socket.on("Join Room", function(choice)
+    {
+        console.log("user " + socket.id +" switched to " + choice);
+        
+        var thisUser = getUser(socket.id);
+        clearInterval(thisUser.handle);
+        
+        var newRoom = initRoom(choice);
+        
+        var initVals = summarize(newRoom);
+        
+        socket.emit("init", initVals);
+        
+        thisUser.room = newRoom;
+        clearInterval(thisUser.handle);
+
+        thisUser.solo = true;
+        thisUser.handle = setInterval(function() {
+           var alerts = iterateRoom(thisUser.room);
+           var summary = summarize(thisUser.room);
+           socket.emit("update bars", {bars: summary.bars, elapsedTime : timeGap});
+           socket.emit("alerts", alerts);
+           },
+           timeGap);
+     
+     
+    });
+    
+    // fires when users choose to join a group room
+    socket.on("Group room", function(choice)
+    {
+        console.log(socket.id + " requests to join group room " + choice);
+        
+        if (groupRoomNames.indexOf(choice) == -1) {
+            socket.emit("No Such Room");
+            console.log("No such room found");
+            return;
+        }
+
+        socket.join(choice);
+        
+        var thisUser = getUser(socket.id);
+        
+        thisUser.room = choice;
+        thisUser.solo = false;
+               
+        var groupRoom = getGroupRoom(choice);
+        
+        for (user in groupRoom.users)
+        {
+            socket.emit("add user", groupRoom.users[user].name);
+        }
+        groupRoom.users.push(thisUser);
+        
+        var initVals = summarize(groupRoom.room);
+        
+        thisUser.name = ("guest" + groupRoom.users.length);
+        
+        socket.to(groupRoom.name).emit('chat message', {source:"system", type:"system", content: thisUser.name +" has joined the channel."});
+        socket.to(groupRoom.name).emit("add user", thisUser.name);
+        
+        
+        
+        if (groupRoom.users.length <= 1)
+        {   
+            // sets the room end time for 10 minutes in the future
+            groupRoom.endTime = Date.now() + (timeLimitMins * 60 * 1000);
+            
+            groupRoom.voteTime = Date.now() + voteGap;
+            
+            console.log("Setting Handle");
+            groupRoom.tickHandle = setInterval(function() {
+                var alerts = iterateRoom(groupRoom.room);
+                var summary = summarize(groupRoom.room);
+                io.to(groupRoom.name).emit("update room", {details: summary, elapsedTime : timeGap, timeLeft : groupRoom.endTime - Date.now(), voteTime: (groupRoom.voteTime - Date.now())});
+                
+                io.to(groupRoom.name).emit("alerts", alerts);
+                
+                if (Date.now() >= groupRoom.endTime)
+                {
+                    clearInterval(groupRoom.tickHandle);
+                    clearInterval(groupRoom.voteHandle);
+                    io.to(groupRoom.name).emit("Time Finished", {time_exceeded: groupRoom.room.timeExceeded, time_at_goal: groupRoom.room.timeAtGoal, score_profile: groupRoom.room.scoreSheet});
+                    console.log("group room values");
+                    console.log(groupRoom);
+                    console.log(groupRoom);
+                    
+                    initGroupRoom( groupRoomNames.indexOf(groupRoom.name));
+                }
+            },
+            timeGap);
+            
+            groupRoom.voteHandle = setInterval(function() {
+                resolveVotes(groupRoom);
+                io.to(groupRoom.name).emit("vote done");
+                groupRoom.voteTime = Date.now() + voteGap;
+            },
+            voteGap);
+        }
+        
+        socket.emit("init", initVals);     
+
+        
+    });
+    */

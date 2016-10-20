@@ -42,15 +42,8 @@ app.controller('mainController', function($scope, $timeout, socket) {
     var drawn = [];
     var cCoefficient = 1;
     
-    // --- requests room change from the server ----//
-    $scope.changeRoom = function(room){
-        console.log("ChangeRoom Request::" +  room);
-        $scope.room = null;
-        socket.emit("switch room", ("Solo_"+room));
-    }
-    
+    // toggels chat panel visibility in group rooms
     $scope.toggleChat = function(){
-        console.log("showChat is " + $scope.showChat);
         $scope.showChat = !$scope.showChat;
         if ($scope.chatCollapseIcon == "<<")
         {
@@ -186,6 +179,8 @@ app.controller('mainController', function($scope, $timeout, socket) {
             }
         }
     }
+    
+    // goes up a level in the room
     $scope.back = function(){
         
         console.log("NavDepth " + $scope.navDepth);
@@ -219,7 +214,7 @@ app.controller('mainController', function($scope, $timeout, socket) {
         $scope.navDepth += 1;
         if ($scope.style == null )
         {
-            socket.emit("Start Rooms", choice);
+            socket.emit("Join Lobby", choice);
             $scope.style = choice;
             $scope.template = "./partials/descriptions/"+ choice + ".html";
             $scope.descrURL = "./partials/descriptions/"+ choice + ".html";
@@ -228,8 +223,7 @@ app.controller('mainController', function($scope, $timeout, socket) {
         {   
             $scope.template = "./partials/"+$scope.style+".html";
             $scope.description = false;
-            socket.emit($scope.style + " room", choice);
-            console.log($scope.style + " room");
+            socket.emit("Join Room", choice);
             
             if ($scope.style == "Group")
             {
@@ -362,6 +356,8 @@ app.controller('mainController', function($scope, $timeout, socket) {
     
     // this is a more comprehensive method including victory condition handling //
     socket.on('update room', function(data){
+        console.log("Update recieved");
+        
         var bars = data.details.bars;
         for (i = 0; i < bars.length; i++){
            
@@ -419,67 +415,67 @@ app.controller('mainController', function($scope, $timeout, socket) {
     
     
     // ----------------------- Chat messaging section --------------------//
-        socket.on('connect', function(){
-            socket.emit('user count query');
-        });
+    socket.on('connect', function(){
+        socket.emit('user count query');
+    });
+    
+    socket.on('user count response', function(count){
+        $("#userMult").text(count);
+    });
+    
+    socket.on('accept name', function(name){
+        console.log("My name " + name + " was accepted!");
+        $("#loginStats").hide();
+        $("#messageBlock").show();
+        $("#m").focus();
         
-        socket.on('user count response', function(count){
-            $("#userMult").text(count);
-        });
-        
-        socket.on('accept name', function(name){
-            console.log("My name " + name + " was accepted!");
-            $("#loginStats").hide();
-            $("#messageBlock").show();
-            $("#m").focus();
-            
-            socket.emit("list users");
-            $('#yourName').text(name);
-        });
-        
-        socket.on('reject name', function(){
-            console.log("My name request rejected :(");
-            $("#warning").show();
-        });
+        socket.emit("list users");
+        $('#yourName').text(name);
+    });
+    
+    socket.on('reject name', function(){
+        console.log("My name request rejected :(");
+        $("#warning").show();
+    });
 
-        socket.on('chat message', function(msg){
-            console.log("recieved message" );
-            console.log(msg);
-            $scope.messages.push(msg);
-        });
-        
-        socket.on('system message', function(msg){
-            $scope.messages.push(msg);
-        });
-        
-        socket.on('add user', function(name){
-            $scope.users.push({name: name, hasVoted:false});
-        });
-        
-        socket.on('remove user', function(name){
-            for (user in $scope.users)
-            {
-                if ($scope.users[user].name == name)
-                {
-                    $scope.users.splice(user, 1);
-                }
-            }
-        });
-
-        
-        $scope.sendMessage = function()
+    socket.on('chat message', function(msg){
+        console.log("recieved message" );
+        console.log(msg);
+        $scope.messages.push(msg);
+    });
+    
+    socket.on('system message', function(msg){
+        $scope.messages.push(msg);
+    });
+    
+    socket.on('add user', function(name){
+        $scope.users.push({name: name, hasVoted:false});
+    });
+    
+    socket.on('remove user', function(name){
+        for (user in $scope.users)
         {
-            if ($scope.chat.myMessage == "")
+            if ($scope.users[user].name == name)
             {
-                return;
+                $scope.users.splice(user, 1);
             }
-            console.log("Sending chat message " + $scope.chat.myMessage);
-            $scope.messages.push({source: "You", type: "plain", content: $scope.chat.myMessage});
-            socket.emit("chat message", $scope.chat.myMessage);
-            
-            $scope.chat.myMessage = "";
         }
-        // ---- end of group messaging section --- //
+    });
+
+    
+    $scope.sendMessage = function()
+    {
+        if ($scope.chat.myMessage == "")
+        {
+            return;
+        }
+        console.log("Sending chat message " + $scope.chat.myMessage);
+        $scope.messages.push({source: "You", type: "plain", content: $scope.chat.myMessage});
+        socket.emit("chat message", $scope.chat.myMessage);
+        
+        $scope.chat.myMessage = "";
+    }
+    // ---- end of group messaging section --- //
 });
 
 function showGraph(data){
