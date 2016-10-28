@@ -517,34 +517,9 @@ function showGraph(data){
             
             clearInterval(renderHandle);
         }
-    }, 100);
-    //data.times  
+    }, 100);  
 }
 
-/*
-
- $('#nameSelection').submit(function(){
-    console.log("submitting name w/ jquery");
-    var name = $("#name").val();
-    socket.emit("request name", name);
-    return false;
-});
-
-$('#messageForm').submit(function(){
-    var message = $('#m').val();
-    socket.emit('chat message', name, message);
-    var ownMessage = "You said: " + message;
-    displayMessage(ownMessage);
-    $('#m').val('');  
-    return false;
-});     
-
-function displayMessage(msg, type){
-    $('#messages').append($('<li class="'+type+'">').text(msg));
-    $('#messages').animate({scrollTop: $('#messages').prop("scrollHeight")}, 300);
-}; */
-// This factory wraps the socket.io functionality to 
-// allow access to it within the angular controller
 app.factory('socket', function ($rootScope) {
   var socket = io.connect();
   return {

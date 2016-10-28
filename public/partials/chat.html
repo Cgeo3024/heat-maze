@@ -15,7 +15,7 @@
     <div id="messageList" >
         <h3> Chat Log </h3>
         <ul id="messages">
-            <li ng-repeat="message in messages track by $index" class="message.type"> {{message.source}} said : {{message.content}} </li>
+            <li ng-repeat="message in messages track by $index"  ng-class="message.type"> <span class="nameplate"> {{message.source}} said : </span>{{message.content}} </li>
         </ul>
         <form ng-submit="sendMessage()">
             <input type="text" id="m" autocomplete="off" ng-model="chat.myMessage"></input>
